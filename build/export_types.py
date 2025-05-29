@@ -10,6 +10,7 @@ Script to export pydantic types from a python file, defaulting to "schemas.py" t
 
 For sharing types precisely between python and typescript
 """
+
 import importlib.util
 import inspect
 import json

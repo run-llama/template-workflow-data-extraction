@@ -42,11 +42,11 @@ class LoopFiles(Workflow):
         await asyncio.sleep(LOOP_SLEEP_TIME)
         return StartEvent()
 
+
 workflow = LoopFiles(timeout=None)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-
 
     async def main():
         await workflow.run()
