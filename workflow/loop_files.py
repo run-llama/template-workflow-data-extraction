@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-from dotenv import load_dotenv
 from llama_index.core.workflow import (
     Context,
     Event,
@@ -47,6 +46,7 @@ workflow = LoopFiles(timeout=None)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+
 
     async def main():
         await workflow.run()
