@@ -5,7 +5,6 @@ import dotenv
 from extracted_data_client import AuthenticatedClient
 from llama_cloud_services import LlamaExtract
 
-
 dotenv.load_dotenv()
 
 # Add getters for clients and environment variables here.
