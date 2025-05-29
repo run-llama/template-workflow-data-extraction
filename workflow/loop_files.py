@@ -43,12 +43,10 @@ class LoopFiles(Workflow):
         await asyncio.sleep(LOOP_SLEEP_TIME)
         return StartEvent()
 
+workflow = LoopFiles(timeout=None)
 
 if __name__ == "__main__":
-    load_dotenv()
     logging.basicConfig(level=logging.INFO)
-
-    workflow = LoopFiles(timeout=None)
 
     async def main():
         await workflow.run()
