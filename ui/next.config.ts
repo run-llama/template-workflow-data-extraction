@@ -3,7 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   transpilePackages: ["@llamaindex/agent-app"],
-  assetPrefix: process.env.LLAMA_DEPLOY_NEXTJS_ASSET_PREFIX || "",
+  basePath: process.env.LLAMA_DEPLOY_NEXTJS_BASE_PATH,
+  env: {
+    NEXT_PUBLIC_LLAMA_DEPLOY_NEXTJS_DEPLOYMENT_NAME:
+      process.env.LLAMA_DEPLOY_NEXTJS_DEPLOYMENT_NAME || "default",
+  },
 };
 
 export default nextConfig;
