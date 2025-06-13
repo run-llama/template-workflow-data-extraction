@@ -45,11 +45,8 @@ def export_types(
     app_path = Path(__file__).parent.parent
     print("Exporting types...")
     schema_path = app_path / "workflow" / schema_file
-    print(schema_path)
     if not schema_path.exists():
-        raise typer.BadParameter(
-            f"Schema file '{schema_file}' not found in app"
-        )
+        raise typer.BadParameter(f"Schema file '{schema_file}' not found in app")
     print(f"Exporting types from {schema_path}...")
     output_dir = app_path / "types"
     ts_output_dir = app_path / "ui" / "src" / "schemas"
