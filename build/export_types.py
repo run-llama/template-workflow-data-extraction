@@ -42,12 +42,13 @@ def export_types(
         "schemas.py", help="The name of the model file to export types from"
     ),
 ):
-    app_path = Path(__file__).parent
+    app_path = Path(__file__).parent.parent
     print("Exporting types...")
     schema_path = app_path / "workflow" / schema_file
+    print(schema_path)
     if not schema_path.exists():
         raise typer.BadParameter(
-            f"Schema file '{schema_file}' not found in app '{app}'"
+            f"Schema file '{schema_file}' not found in app"
         )
     print(f"Exporting types from {schema_path}...")
     output_dir = app_path / "types"
@@ -97,3 +98,7 @@ def export_schemas(py_file: Path, output_dir: Path):
             with open(os.path.join(output_dir, f"{name}.json"), "w") as f:
                 f.write(json.dumps(normalized_schema, indent=2))
             print(f"Exported {name} to {name}.json")
+
+
+if __name__ == "__main__":
+    app()
