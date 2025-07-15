@@ -1,0 +1,20 @@
+[project]
+name = "{{project_name}}-workflow"
+version = "0.1.0"
+description = "Extracts data"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "llama-cloud-services>=0.6.46",
+    "workflows>=1.1.0",
+    "python-dotenv>=1.1.0"
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.10"
+]
+
+[build-system]
+requires = ["uv_build>=0.7.20,<0.8"]
+build-backend = "uv_build"

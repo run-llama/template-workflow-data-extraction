@@ -1,13 +1,14 @@
 import logging
 
-from llama_index.core.workflow import StartEvent, StopEvent, Workflow, step
-from llama_index.core.workflow.retry_policy import ConstantDelayRetryPolicy
+from workflows import Workflow, step
+from workflows.events import StartEvent, StopEvent
+from workflows.retry_policy import ConstantDelayRetryPolicy
 
 logger = logging.getLogger(__name__)
 
 
 class FileEvent(StartEvent):
-    file_path: str
+    file_id: str
 
 
 class ProcessFileWorkflow(Workflow):

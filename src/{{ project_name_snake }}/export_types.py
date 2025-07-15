@@ -1,10 +1,3 @@
-# /// script
-# dependencies = [
-#   "pydantic==2.11.4",
-#   "jsonref==1.1.0",
-#   "typer==0.15.3",
-# ]
-# ///
 """
 Script to export pydantic types from a python file, defaulting to "schemas.py" to a json schema and then to a zod schema.
 

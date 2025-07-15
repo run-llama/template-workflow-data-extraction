@@ -7,3 +7,6 @@ project_name:
         {% if not project_name.replace("-", "").isalpha() %}
             Project name must contain only letters and dashes
         {% endif %}
+
+# computed variables
+project_name_snake: "{{ project_name.replace('-', '_') }}"
