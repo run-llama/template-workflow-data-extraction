@@ -8,17 +8,20 @@ default-service: process-file
 services:
   process-file:
     name: Process File
+    envFile: .env
     source:
       type: local
       name: .
       sync_policy: merge
-    path: src/test_proj.process_file.py
+    path: src/test_proj.process_file:workflow
     python-dependencies:
       - "."
 
 ui:
   name: "test-proj UI"
+  envFile: .env
   source:
     type: local
     name: ui
     sync_policy: merge
+  path: ./ui

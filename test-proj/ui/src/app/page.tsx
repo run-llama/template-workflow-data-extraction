@@ -1,46 +1,57 @@
-import { FileCount, FileGrid } from "@llamaindex/agent-app/server";
+"use client";
+import { ItemGrid, ItemCount } from "@llamaindex/components/ui";
+import type { TypedAgentData } from "@llamaindex/cloud/beta/agent";
 import styles from "./page.module.css";
+import { useRouter } from "next/navigation";
+import TriggerFileWorkflow from "@/components/analyze-invoice-file-workflow-button";
+import { data } from "@/lib/data";
 
 export default function Home() {
   const lastMonth = new Date(
     new Date().setMonth(new Date().getMonth() - 1)
   ).toISOString();
+  const router = useRouter();
+  const goToItem = (item: TypedAgentData) => {
+    router.push(`/item/${item.id}`);
+  };
   return (
     <div className={styles.page}>
       <main className={styles.main}>
         <div className={styles.grid}>
-          <FileCount
+          <ItemCount
             title="Total Documents"
-            filter_fields={{ created_at: { gt: lastMonth } }}
-            filter_status_counts={{}}
+            filter={{ created_at: { gt: lastMonth } }}
+            client={data}
           />
-          <FileCount
+          <ItemCount
             title="Reviewed"
-            filter_fields={{ created_at: { gt: lastMonth } }}
-            filter_status_counts={{ pending_review: { eq: 0 } }}
+            filter={{
+              created_at: { gt: lastMonth },
+              status: { eq: "approved" },
+            }}
+            client={data}
           />
-          <FileCount
+          <ItemCount
             title="Needs Review"
-            filter_fields={{ created_at: { gt: lastMonth } }}
-            filter_status_counts={{ pending_review: { gt: 0 } }}
+            filter={{
+              created_at: { gt: lastMonth },
+              status: { eq: "pending_review" },
+            }}
+            client={data}
           />
         </div>
-        <FileGrid
-          fileRoute="/file"
-          includeColumns={[
-            {
-              standardColumn: "file_name",
-            },
-            {
-              standardColumn: "status",
-            },
-            {
-              standardColumn: "synced_at",
-            },
-            {
-              standardColumn: "created_at",
-            },
-          ]}
+        <div className={styles.commandBar}>
+          <TriggerFileWorkflow />
+        </div>
+        <ItemGrid
+          onRowClick={goToItem}
+          builtInColumns={{
+            fileName: true,
+            status: true,
+            createdAt: true,
+            itemsToReview: true,
+          }}
+          client={data}
         />
       </main>
     </div>

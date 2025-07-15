@@ -11,15 +11,13 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from types import ModuleType
 
 import jsonref
-import typer
 from pydantic import BaseModel
-from typer import Typer
-
-app = Typer()
+import click
 
 
 def run_command(cmd: str):
@@ -29,22 +27,25 @@ def run_command(cmd: str):
         sys.exit(result.returncode)
 
 
-@app.command()
-def export_types(
-    schema_file: str = typer.Option(
-        "schemas.py", help="The name of the model file to export types from"
-    ),
-):
-    app_path = Path(__file__).parent.parent
+@click.command()
+@click.option(
+    "--schema-file",
+    default="schemas.py",
+    help="The name of the model file to export types from"
+)
+def export_types(schema_file: str):
+    app_path = Path(__file__).parent.parent.parent
     print("Exporting types...")
-    schema_path = app_path / "workflow" / schema_file
+    schema_path = Path(__file__).parent / schema_file
     if not schema_path.exists():
-        raise typer.BadParameter(f"Schema file '{schema_file}' not found in app")
+        raise click.BadParameter(f"Schema file '{schema_file}' not found in app")
     print(f"Exporting types from {schema_path}...")
-    output_dir = app_path / "types"
-    ts_output_dir = app_path / "ui" / "src" / "schemas"
-    export_schemas(schema_path, output_dir)
-    schema_dir_to_zod_schema(output_dir, ts_output_dir)
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = Path(temp_dir) / "types"
+        ts_output_dir = app_path / "ui" / "src" / "schemas"
+        export_schemas(schema_path, output_dir)
+        schema_dir_to_zod_schema(output_dir, ts_output_dir)
 
 
 def schema_dir_to_zod_schema(schema_dir: Path, output_dir: Path):
@@ -91,4 +92,4 @@ def export_schemas(py_file: Path, output_dir: Path):
 
 
 if __name__ == "__main__":
-    app()
+    export_types()

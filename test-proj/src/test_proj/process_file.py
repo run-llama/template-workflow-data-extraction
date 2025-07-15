@@ -162,3 +162,6 @@ class ProcessFileWorkflow(Workflow):
                 )
             )
             raise e
+
+
+workflow = ProcessFileWorkflow()
