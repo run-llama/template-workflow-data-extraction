@@ -9,4 +9,7 @@ project_name:
         {% endif %}
 
 # computed variables
-project_name_snake: "{{ project_name.replace('-', '_') }}"
+project_name_snake:
+    type: str
+    default: "{{ project_name.replace('-', '_') }}"
+    when: false
