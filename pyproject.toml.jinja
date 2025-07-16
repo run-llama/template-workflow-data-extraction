@@ -1,0 +1,30 @@
+[project]
+name = "{{project_name}}"
+version = "0.1.0"
+description = "Extracts data"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "llama-cloud-services>=0.6.46",
+    "workflows>=1.1.0",
+    "python-dotenv>=1.1.0",
+    "jsonref>=1.1.0",
+    "click>=8.2.1",
+    "httpx>=0.28.1",
+]
+
+[project.scripts]
+export-types = "{{project_name_snake}}.export_types:export_types"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.10",
+    "llama_deploy"
+]
+
+[tool.uv.sources]
+llama-deploy = { git = "https://github.com/run-llama/llama_deploy", rev = "main" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

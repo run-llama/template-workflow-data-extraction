@@ -1,0 +1,25 @@
+name: "{{project_name}}"
+
+control-plane:
+  port: 8000
+
+default-service: process-file
+
+services:
+  process-file:
+    name: Process File
+    env-files:
+      - .env
+    source:
+      type: local
+      name: .
+    path: src/{{project_name_snake}}.process_file:workflow
+
+
+ui:
+  name: "{{project_name}} UI"
+  env-files:
+    - .env
+  source:
+    type: local
+    name: ./ui
