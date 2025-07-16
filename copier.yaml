@@ -16,3 +16,4 @@ project_name_snake:
 
 _exclude:
   - "test-proj"
+  - ".git"
