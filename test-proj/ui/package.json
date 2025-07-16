@@ -9,7 +9,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@llamaindex/chat-ui": "^0.5.10",
+    "@llamaindex/chat-ui": "^0.5.16",
     "@llamaindex/cloud": "^4.0.23",
     "@llamaindex/components": "https://llamaindex-components-54aeedb3.s3.amazonaws.com/packages/@llamaindex/components/0.1.0/llamaindex-components-0.1.0.tgz",
     "@radix-ui/themes": "^3.2.1",

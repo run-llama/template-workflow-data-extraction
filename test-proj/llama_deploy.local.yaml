@@ -13,10 +13,8 @@ services:
     source:
       type: local
       name: .
-      sync_policy: merge
     path: src/test_proj.process_file:workflow
-    python-dependencies:
-      - "."
+
 
 ui:
   name: "test-proj UI"
@@ -25,4 +23,3 @@ ui:
   source:
     type: local
     name: ./ui
-    sync_policy: merge

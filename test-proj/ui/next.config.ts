@@ -8,14 +8,6 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_LLAMA_DEPLOY_NEXTJS_DEPLOYMENT_NAME:
       process.env.LLAMA_DEPLOY_NEXTJS_DEPLOYMENT_NAME || "default",
   },
-  turbopack: {
-    resolveAlias: {
-      "@llamaindex/components": path.resolve(
-        __dirname,
-        "node_modules/@llamaindex/components/src"
-      ),
-    },
-  },
 };
 
 export default nextConfig;

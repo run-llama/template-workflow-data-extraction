@@ -6,7 +6,7 @@ import {
   FileUploadData,
 } from "@llamaindex/components/ui";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorkflow } from "@llamaindex/chat-ui";
 import { toast } from "sonner";
 import { platformClient } from "@/lib/client";
@@ -58,6 +58,17 @@ export default function TriggerFileWorkflow({
       toast.info(lastEvent.data.status);
     }
   }, [wf.events.length]);
+
+  const prevStatus = useRef<string>(wf.status);
+  useEffect(() => {
+    const currentStatus = wf.status;
+    const previousStatus = prevStatus.current;
+    prevStatus.current = currentStatus;
+    if (currentStatus !== "running" && previousStatus === "running") {
+      // some sort of bug in the useWorkflow onStopEvent hook
+      onSuccess(wf.events[wf.events.length - 1]);
+    }
+  }, [wf.status]);
 
   const handleFileUpload = async (data: FileUploadData[]) => {
     const { fileId } = data[0];

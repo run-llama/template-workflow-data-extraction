@@ -7,7 +7,7 @@ from llama_cloud_services.extract import ExtractConfig, ExtractMode
 from llama_cloud.core.api_error import ApiError
 from llama_cloud_services.beta.agent_data import AsyncAgentDataClient, ExtractedData
 from test_proj.schemas import MySchema
-from llama_cloud.client import AsyncClientWrapper
+from llama_cloud.client import AsyncLlamaCloud
 
 dotenv.load_dotenv()
 
@@ -20,6 +20,7 @@ agent_name = os.getenv("LLAMA_DEPLOY_DEPLOYMENT_NAME") or "extraction-agent"
 api_key = os.environ["LLAMA_CLOUD_API_KEY"]
 # get this in case running against a different environment than production
 base_url = os.getenv("LLAMA_CLOUD_BASE_URL")
+extracted_data_collection = "test-proj"
 
 
 @functools.lru_cache(maxsize=None)
@@ -52,14 +53,16 @@ def get_data_client() -> AsyncAgentDataClient:
         base_url=base_url,
         token=api_key,
         agent_url_id=agent_name,
+        collection=extracted_data_collection,
         # update MySchema for your schema, but retain the ExtractedData container
         type=ExtractedData[MySchema],
     )
 
 
+
 @functools.lru_cache(maxsize=None)
-def get_base_client() -> AsyncClientWrapper:
-    return AsyncClientWrapper(
+def get_llama_cloud_client():
+    return AsyncLlamaCloud(
         base_url=base_url,
         token=api_key,
     )

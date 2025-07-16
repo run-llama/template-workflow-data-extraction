@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { zodToJsonSchema } from "@llamaindex/components/lib";
 import { data as dataClient } from "@/lib/data";
 import { platformClient } from "@/lib/client";
+import { APP_TITLE } from "@/lib/config";
 
 export default function ItemPage() {
   const { itemId } = useParams();
@@ -36,7 +37,7 @@ export default function ItemPage() {
     const fileName = itemHookData.item?.data?.file_name;
     if (fileName) {
       setBreadcrumbs([
-        { label: "Invoice Extraction", href: "/" },
+        { label: APP_TITLE, href: "/" },
         {
           label: fileName,
           isCurrentPage: true,
@@ -46,7 +47,7 @@ export default function ItemPage() {
 
     return () => {
       // Reset to default breadcrumb when leaving the page
-      setBreadcrumbs([{ label: "Invoice Extraction", href: "/" }]);
+      setBreadcrumbs([{ label: APP_TITLE, href: "/" }]);
     };
   }, [itemHookData.item?.data?.file_name, setBreadcrumbs]);
 

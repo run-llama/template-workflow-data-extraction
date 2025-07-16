@@ -1,4 +1,5 @@
 import React from "react";
+import { APP_TITLE } from "./config";
 
 export interface BreadcrumbItem {
   label: string;
@@ -25,7 +26,7 @@ export const ToolbarProvider = ({
 }) => {
   const [buttons, setButtons] = React.useState<React.ReactNode[]>([]);
   const [breadcrumbs, setBreadcrumbs] = React.useState<BreadcrumbItem[]>([
-    { label: "Invoice Extraction", href: "/" }
+    { label: APP_TITLE, href: "/" }
   ]);
   
   return (
