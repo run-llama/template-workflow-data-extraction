@@ -10,6 +10,7 @@ dependencies = [
     "python-dotenv>=1.1.0",
     "jsonref>=1.1.0",
     "click>=8.2.1",
+    "httpx>=0.28.1",
 ]
 
 [project.scripts]
@@ -17,12 +18,13 @@ export-types = "{{project_name_snake}}.export_types:export_types"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.11.10"
+    "ruff>=0.11.10",
+    "llama_deploy"
 ]
 
 [tool.uv.sources]
 llama-deploy = { git = "https://github.com/run-llama/llama_deploy", rev = "main" }
 
 [build-system]
-requires = ["uv_build>=0.7.20,<0.8"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

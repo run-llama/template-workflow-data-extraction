@@ -6,8 +6,8 @@ from llama_cloud_services import ExtractionAgent, LlamaExtract
 from llama_cloud_services.extract import ExtractConfig, ExtractMode
 from llama_cloud.core.api_error import ApiError
 from llama_cloud_services.beta.agent_data import AsyncAgentDataClient, ExtractedData
-from test_proj.schemas import MySchema
 from llama_cloud.client import AsyncLlamaCloud
+from .schemas import MySchema
 
 dotenv.load_dotenv()
 
@@ -20,7 +20,7 @@ agent_name = os.getenv("LLAMA_DEPLOY_DEPLOYMENT_NAME") or "extraction-agent"
 api_key = os.environ["LLAMA_CLOUD_API_KEY"]
 # get this in case running against a different environment than production
 base_url = os.getenv("LLAMA_CLOUD_BASE_URL")
-extracted_data_collection = "test-proj"
+extracted_data_collection = "{{ project_name }}"
 
 
 @functools.lru_cache(maxsize=None)

@@ -1,4 +1,4 @@
-name: "test-proj"
+name: "{{project_name}}"
 
 control-plane:
   port: 8000
@@ -13,11 +13,11 @@ services:
     source:
       type: local
       name: .
-    path: src/test_proj.process_file:workflow
+    path: src/{{project_name_snake}}.process_file:workflow
 
 
 ui:
-  name: "test-proj UI"
+  name: "{{project_name}} UI"
   env-files:
     - .env
   source:
