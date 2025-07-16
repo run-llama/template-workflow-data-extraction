@@ -8,7 +8,8 @@ default-service: process-file
 services:
   process-file:
     name: Process File
-    envFile: .env
+    env-files:
+      - .env
     source:
       type: local
       name: .
@@ -19,7 +20,8 @@ services:
 
 ui:
   name: "test-proj UI"
-  envFile: .env
+  env-files:
+    - .env
   source:
     type: local
     name: ui

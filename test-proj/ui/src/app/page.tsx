@@ -3,7 +3,7 @@ import { ItemGrid, ItemCount } from "@llamaindex/components/ui";
 import type { TypedAgentData } from "@llamaindex/cloud/beta/agent";
 import styles from "./page.module.css";
 import { useRouter } from "next/navigation";
-import TriggerFileWorkflow from "@/components/analyze-invoice-file-workflow-button";
+import TriggerFileWorkflow from "@/components/workflow-trigger";
 import { data } from "@/lib/data";
 
 export default function Home() {
@@ -50,6 +50,7 @@ export default function Home() {
             status: true,
             createdAt: true,
             itemsToReview: true,
+            actions: true,
           }}
           client={data}
         />

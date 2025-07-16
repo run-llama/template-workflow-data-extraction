@@ -1,7 +1,6 @@
 "use client";
 import {
   AcceptReject,
-  Badge,
   ExtractedDataDisplay,
   FilePreview,
   ProcessingSteps,
@@ -10,26 +9,46 @@ import {
 import { Clock, XCircle } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { InvoiceSchema } from "../../../schemas/InvoiceSchema";
+import { MySchema } from "../../../schemas/MySchema";
 import { useToolbar } from "@/lib/ToolbarContext";
 import { useRouter } from "next/navigation";
 import { zodToJsonSchema } from "@llamaindex/components/lib";
 import { data as dataClient } from "@/lib/data";
+import { platformClient } from "@/lib/client";
 
 export default function ItemPage() {
   const { itemId } = useParams();
   const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
-  const { setButtons } = useToolbar();
+  const { setButtons, setBreadcrumbs } = useToolbar();
 
   // Use the hook to fetch item data
   const itemHookData = useItemData({
-    jsonSchema: zodToJsonSchema(InvoiceSchema, { lastFields: ["line_items"] }),
+    jsonSchema: zodToJsonSchema(MySchema),
     itemId: itemId as string,
     isMock: false,
     client: dataClient,
   });
 
   const router = useRouter();
+
+  // Update breadcrumb when item data loads
+  useEffect(() => {
+    const fileName = itemHookData.item?.data?.file_name;
+    if (fileName) {
+      setBreadcrumbs([
+        { label: "Invoice Extraction", href: "/" },
+        {
+          label: fileName,
+          isCurrentPage: true,
+        },
+      ]);
+    }
+
+    return () => {
+      // Reset to default breadcrumb when leaving the page
+      setBreadcrumbs([{ label: "Invoice Extraction", href: "/" }]);
+    };
+  }, [itemHookData.item?.data?.file_name, setBreadcrumbs]);
 
   useEffect(() => {
     setButtons(() => [
@@ -43,7 +62,7 @@ export default function ItemPage() {
     return () => {
       setButtons(() => []);
     };
-  }, [itemHookData.data]);
+  }, [itemHookData.data, setButtons]);
 
   const {
     item: itemData,
@@ -81,40 +100,24 @@ export default function ItemPage() {
     <div className="flex h-full bg-gray-50">
       {/* Left Side - File Preview */}
       <div className="w-1/2 border-r border-gray-200 bg-white">
-        <div className="h-full p-4 flex flex-col">
-          <div className="mb-4 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <h1 className="text-lg font-semibold text-gray-900">
-                {itemData.data.file_name}
-              </h1>
-            </div>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline">
-                {itemData.data.status.replace("_", " ")}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden">
-            {itemData.data.file_id && (
-              <FilePreview
-                fileId={itemData.data.file_id}
-                onBoundingBoxClick={(box, pageNumber) => {
-                  console.log(
-                    "Bounding box clicked:",
-                    box,
-                    "on page:",
-                    pageNumber
-                  );
-                }}
-              />
-            )}
-          </div>
-        </div>
+        {itemData.data.file_id && (
+          <FilePreview
+            fileId={itemData.data.file_id}
+            onBoundingBoxClick={(box, pageNumber) => {
+              console.log(
+                "Bounding box clicked:",
+                box,
+                "on page:",
+                pageNumber
+              );
+            }}
+            client={platformClient}
+          />
+        )}
       </div>
 
       {/* Right Side - Review Panel */}
-      <div className="flex-1 bg-white overflow-y-auto">
+      <div className="flex-1 bg-white h-full overflow-y-auto">
         <div className="p-4 space-y-4">
           {/* Processing Steps */}
           {(itemData as any).workflow_events && (
