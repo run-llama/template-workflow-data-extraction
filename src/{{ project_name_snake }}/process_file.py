@@ -11,7 +11,7 @@ from workflows import Context, Workflow, step
 from workflows.events import Event, StartEvent, StopEvent
 from workflows.retry_policy import ConstantDelayRetryPolicy
 
-from .config import get_base_client, get_data_client, get_extract_agent
+from .config import get_llama_cloud_client, get_data_client, get_extract_agent
 from .schemas import MySchema
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class ProcessFileWorkflow(Workflow):
     """
 
     @step(retry_policy=ConstantDelayRetryPolicy(maximum_attempts=3, delay=10))
-    async def run_file(self, event: FileEvent) -> StopEvent:
+    async def run_file(self, event: FileEvent) -> DownloadFileEvent:
         return DownloadFileEvent(file_id=event.file_id)
 
     @step(retry_policy=ConstantDelayRetryPolicy(maximum_attempts=3, delay=10))
@@ -57,12 +57,15 @@ class ProcessFileWorkflow(Workflow):
         self, event: DownloadFileEvent, ctx: Context
     ) -> FileDownloadedEvent:
         try:
-            file_url = await AsyncFilesClient(
-                client_wrapper=get_base_client(),
-            ).read_file_content(event.file_id)
+            file_metadata = await get_llama_cloud_client().files.get_file(
+                id=event.file_id
+            )
+            file_url = await get_llama_cloud_client().files.read_file_content(
+                event.file_id
+            )
 
             temp_dir = tempfile.gettempdir()
-            filename = file_url.url.split("/")[-1]
+            filename = file_metadata.name
             file_path = os.path.join(temp_dir, filename)
             client = httpx.AsyncClient()
             # Report progress to the UI
@@ -83,7 +86,7 @@ class ProcessFileWorkflow(Workflow):
                 file_id=event.file_id, file_path=file_path, filename=filename
             )
         except Exception as e:
-            logger.error(f"Error downloading file {event.file_id}: {e}")
+            logger.error(f"Error downloading file {event.file_id}: {e}", exc_info=True)
             ctx.write_event_to_stream(
                 UIToast(
                     level="error",
@@ -117,7 +120,10 @@ class ProcessFileWorkflow(Workflow):
                 extracted=extracted,
             )
         except Exception as e:
-            logger.error(f"Error extracting data from file {event.filename}: {e}")
+            logger.error(
+                f"Error extracting data from file {event.filename}: {e}",
+                exc_info=True,
+            )
             ctx.write_event_to_stream(
                 UIToast(
                     level="error",
@@ -139,7 +145,7 @@ class ProcessFileWorkflow(Workflow):
                 )
             )
             item_id = await get_data_client().create_item(
-                ExtractedData(
+                ExtractedData.create(
                     data=event.extracted,
                     status="pending_review",
                     file_id=event.file_id,
@@ -153,7 +159,8 @@ class ProcessFileWorkflow(Workflow):
             )
         except Exception as e:
             logger.error(
-                f"Error recording extracted data for file {event.filename}: {e}"
+                f"Error recording extracted data for file {event.filename}: {e}",
+                exc_info=True,
             )
             ctx.write_event_to_stream(
                 UIToast(
@@ -162,3 +169,6 @@ class ProcessFileWorkflow(Workflow):
                 )
             )
             raise e
+
+
+workflow = ProcessFileWorkflow(timeout=None)
