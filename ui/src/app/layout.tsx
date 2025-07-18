@@ -8,11 +8,12 @@ import {
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbSeparator,
-} from "@llamaindex/components/ui";
+} from "@llamaindex/ui";
 import Link from "next/link";
 import React from "react";
-import { Toaster } from "@llamaindex/components/ui";
+import { Toaster } from "@llamaindex/ui";
 import { useToolbar, ToolbarProvider } from "@/lib/ToolbarContext";
+import "@llamaindex/ui/styles.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
