@@ -1,5 +1,5 @@
 "use client";
-import { ItemGrid, ItemCount } from "@llamaindex/components/ui";
+import { ItemGrid, ItemCount } from "@llamaindex/ui";
 import type { TypedAgentData } from "@llamaindex/cloud/beta/agent";
 import styles from "./page.module.css";
 import { useRouter } from "next/navigation";

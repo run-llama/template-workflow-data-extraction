@@ -5,16 +5,15 @@ import {
   FilePreview,
   ProcessingSteps,
   useItemData,
-} from "@llamaindex/components/ui";
+} from "@llamaindex/ui";
 import { Clock, XCircle } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MySchema } from "../../../schemas/MySchema";
 import { useToolbar } from "@/lib/ToolbarContext";
 import { useRouter } from "next/navigation";
-import { zodToJsonSchema } from "@llamaindex/components/lib";
+import { zodToJsonSchema } from "@llamaindex/ui/lib";
 import { data as dataClient } from "@/lib/data";
-import { platformClient } from "@/lib/client";
 import { APP_TITLE } from "@/lib/config";
 
 export default function ItemPage() {
@@ -112,7 +111,6 @@ export default function ItemPage() {
                 pageNumber
               );
             }}
-            client={platformClient}
           />
         )}
       </div>

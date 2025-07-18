@@ -4,12 +4,11 @@ import {
   FileUploader,
   FILE_TYPE_GROUPS,
   FileUploadData,
-} from "@llamaindex/components/ui";
+} from "@llamaindex/ui";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useWorkflow } from "@llamaindex/chat-ui";
 import { toast } from "sonner";
-import { platformClient } from "@/lib/client";
 
 interface StatusEvent {
   type: "process_file.StatusEvent";
@@ -105,7 +104,6 @@ export default function TriggerFileWorkflow({
       maxFileSizeBytes={50 * 1000 * 1000} // 50MB
       onSuccess={handleFileUpload}
       isProcessing={wf.status === "running"}
-      client={platformClient}
     />
   );
 }
