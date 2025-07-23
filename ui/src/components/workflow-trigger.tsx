@@ -11,14 +11,15 @@ import { useWorkflow } from "@llamaindex/chat-ui";
 import { toast } from "sonner";
 
 interface UIToast {
-  type: "process_file.UIToast";
+  type: `${string}process_file.UIToast`;
   data: {
-    status: string;
+    level: string;
+    message: string;
   };
 }
 
 interface FileEvent {
-  type: "process_file.FileEvent";
+  type: `${string}process_file.FileEvent`;
   data: {
     file_id: string;
   };
@@ -53,8 +54,15 @@ export default function TriggerFileWorkflow({
 
   useEffect(() => {
     const lastEvent = wf.events[wf.events.length - 1];
-    if (lastEvent?.type === "process_file.UIToast") {
-      toast.info(lastEvent.data.status);
+    console.log("lastEvent", lastEvent?.type);
+    if (lastEvent?.type.endsWith("process_file.UIToast")) {
+      if (lastEvent.data.level === "info") {
+        toast.info(lastEvent.data.message);
+      } else if (lastEvent.data.level === "warning") {
+        toast.warning(lastEvent.data.message);
+      } else if (lastEvent.data.level === "error") {
+        toast.error(lastEvent.data.message);
+      }
     }
   }, [wf.events.length]);
 

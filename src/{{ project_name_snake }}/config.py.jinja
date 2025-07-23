@@ -33,6 +33,7 @@ def get_extract_agent() -> ExtractionAgent:
         # advanced
         use_reasoning=False,
         cite_sources=False,
+        confidence_scores=True,
     )
     try:
         existing = extract_api.get_agent(agent_name_or_default)

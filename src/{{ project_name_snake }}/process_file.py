@@ -83,12 +83,6 @@ class ProcessFileWorkflow(Workflow):
             client = httpx.AsyncClient()
             # Report progress to the UI
             logger.info(f"Downloading file {file_url.url} to {file_path}")
-            ctx.write_event_to_stream(
-                UIToast(
-                    level="info",
-                    message=f"Downloading file {file_url.url} to {file_path}",
-                )
-            )
 
             async with client.stream("GET", file_url.url) as response:
                 with open(file_path, "wb") as f:
