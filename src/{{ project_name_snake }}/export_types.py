@@ -1,5 +1,5 @@
 """
-Script to export pydantic types from a python file, defaulting to "schemas.py" to a json schema and then to a zod schema.
+Script to export pydantic types from a python file (default "schemas.py") to json schemas and then to typescript interfaces.
 
 For sharing types precisely between python and typescript
 """
@@ -11,7 +11,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from types import ModuleType
 
@@ -31,7 +30,7 @@ def run_command(cmd: str):
 @click.option(
     "--schema-file",
     default="schemas.py",
-    help="The name of the model file to export types from"
+    help="The name of the model file to export types from",
 )
 def export_types(schema_file: str):
     app_path = Path(__file__).parent.parent.parent
@@ -40,34 +39,19 @@ def export_types(schema_file: str):
     if not schema_path.exists():
         raise click.BadParameter(f"Schema file '{schema_file}' not found in app")
     print(f"Exporting types from {schema_path}...")
-    
-    with tempfile.TemporaryDirectory() as temp_dir:
-        output_dir = Path(temp_dir) / "types"
-        ts_output_dir = app_path / "ui" / "src" / "schemas"
-        export_schemas(schema_path, output_dir)
-        schema_dir_to_zod_schema(output_dir, ts_output_dir)
-
-
-def schema_dir_to_zod_schema(schema_dir: Path, output_dir: Path):
+    output_dir = app_path / "ui" / "src" / "schemas"
     if output_dir.exists():
         shutil.rmtree(output_dir)
     os.makedirs(output_dir)
+    export_schemas(schema_path, output_dir)
+    generate_typescript_interfaces(output_dir)
 
-    for file in schema_dir.glob("*.json"):
-        name = file.name.replace(".json", "")
-        run_command(
-            f"npx -y json-schema-to-zod@2.6.1 --name {name} --module esm --type {name} -i {file} -o {output_dir / file.name.replace('.json', '.ts')}"
-        )
-    # Replace zod import in generated files to use v4
-    for ts_file in output_dir.glob("*.ts"):
-        with open(ts_file, "r") as f:
-            content = f.read()
-        content = content.replace(
-            'import { z } from "zod"', 'import { z } from "zod/v4"'
-        )
-        with open(ts_file, "w") as f:
-            f.write(content)
-    run_command(f"npx -y prettier@3.5.1 --write {output_dir}")
+
+def generate_typescript_interfaces(schema_dir: Path):
+    run_command(
+        f"npx -y json-schema-to-typescript@15.0.4 -i '{schema_dir / '*.json'}' -o {schema_dir}"
+    )
+    run_command(f"npx -y prettier@3.5.1 --write {schema_dir}")
 
 
 def load_module_from_path(module_name: str, file_path: Path) -> ModuleType:
