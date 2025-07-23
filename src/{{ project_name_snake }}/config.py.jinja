@@ -16,6 +16,7 @@ dotenv.load_dotenv()
 # otherwise calls to get or set data will fail. You may need to adjust the `or `
 # name for development
 agent_name = os.getenv("LLAMA_DEPLOY_DEPLOYMENT_NAME")
+agent_name_or_default = agent_name or "{{ project_name }}"
 # required for all llama cloud calls
 api_key = os.environ["LLAMA_CLOUD_API_KEY"]
 # get this in case running against a different environment than production
@@ -29,19 +30,19 @@ def get_extract_agent() -> ExtractionAgent:
     config = ExtractConfig(
         extraction_mode=ExtractMode.BALANCED,
         system_prompt=None,
-        # adnaced
+        # advanced
         use_reasoning=False,
         cite_sources=False,
     )
     try:
-        existing = extract_api.get_agent(agent_name)
+        existing = extract_api.get_agent(agent_name_or_default)
         existing.data_schema = MySchema
         existing.config = config
         return existing
     except ApiError as e:
         if e.status_code == 404:
             return extract_api.create_agent(
-                name=agent_name, data_schema=MySchema, config=config
+                name=agent_name_or_default, data_schema=MySchema, config=config
             )
         else:
             raise
