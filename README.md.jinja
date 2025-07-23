@@ -33,19 +33,23 @@ You can serve it locally with `uv run llamactl serve llama_deploy.local` from wi
 
 After starting with `llamactl`, visit `http://localhost:4501/deployments/{{package_name}}/ui` to see the UI.
 
-
 ## Exporting types
 
-To generate typescript types for sharing with the UI from your `schema.py`, run `uv run export-types` from this directory. This will export zod types to the ui under `ui/src/schemas` for every pydantic model in `schemas.py`.
+To generate typescript types for sharing with the UI from your `schema.py`, run `uv run export-types` from this directory. This will export json schemas and typescript
+types to the ui under `ui/src/schemas` for every pydantic model in `schemas.py`. The UI uses the schemas in order to structure its UI, so make sure to run this after
+you modify you pydantic schemas.
 
 ### Running Workflows
 
 The core value of this template is good extraction. The main python code is in the `src` directory.
 
 Workflows can be triggered from the UI using `useWorkflow` react hooks. You can also add a `if __name__ == "__main__":` handler to individual 
-workflows to run and debug them directly. Eventually there will be support for auto-running workflows in the app.
+workflows to run and debug them directly. Eventually there will be support for auto-running workflows in the app.  The `process_file.py` has main
+handler that will upload a `test.pdf` from your current working directory so you can test your extraction directly.
 
-The current conventions are as follows:
+### Workflow Files
+
+The template includes the following files that you may customize:
 
 - `process_file.py` - this is a workflow triggered for an individual file, triggered from the UI.
 - `config.py` - Environment and secret parsing, and basic client interface construction

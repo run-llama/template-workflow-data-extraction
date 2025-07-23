@@ -9,10 +9,11 @@ import {
 import { Clock, XCircle } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { MySchema } from "../../../schemas/MySchema";
+import type { MySchema } from "../../../schemas/MySchema";
+import MyJsonSchema from "../../../schemas/MySchema.json" with { type: "json" };
 import { useToolbar } from "@/lib/ToolbarContext";
 import { useRouter } from "next/navigation";
-import { zodToJsonSchema } from "@llamaindex/ui/lib";
+import { modifyJsonSchema } from "@llamaindex/ui/lib";
 import { data as dataClient } from "@/lib/data";
 import { APP_TITLE } from "@/lib/config";
 
@@ -22,8 +23,9 @@ export default function ItemPage() {
   const { setButtons, setBreadcrumbs } = useToolbar();
 
   // Use the hook to fetch item data
-  const itemHookData = useItemData({
-    jsonSchema: zodToJsonSchema(MySchema),
+  const itemHookData = useItemData<MySchema>({
+    // order/remove fields as needed here
+    jsonSchema: modifyJsonSchema(MyJsonSchema, {}),
     itemId: itemId as string,
     isMock: false,
     client: dataClient,
