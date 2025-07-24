@@ -69,7 +69,7 @@ export default function ItemPage() {
   const {
     item: itemData,
     data,
-    setData,
+    updateData,
     loading: isLoading,
     error,
   } = itemHookData;
@@ -138,7 +138,7 @@ export default function ItemPage() {
             }
             title="Extracted Data"
             onChange={(updatedData) => {
-              setData(updatedData as any);
+              updateData(updatedData as any);
             }}
             jsonSchema={itemHookData.jsonSchema}
           />
