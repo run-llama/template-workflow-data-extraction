@@ -54,7 +54,6 @@ export default function TriggerFileWorkflow({
 
   useEffect(() => {
     const lastEvent = wf.events[wf.events.length - 1];
-    console.log("lastEvent", lastEvent?.type);
     if (lastEvent?.type.endsWith("process_file.UIToast")) {
       if (lastEvent.data.level === "info") {
         toast.info(lastEvent.data.message);
