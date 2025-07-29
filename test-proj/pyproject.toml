@@ -1,5 +1,5 @@
 [project]
-name = "{{project_name}}"
+name = "test-proj"
 version = "0.1.0"
 description = "Extracts data"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-export-types = "{{project_name_snake}}.export_types:export_types"
+export-types = "test_proj.export_types:export_types"
 
 [dependency-groups]
 dev = [
