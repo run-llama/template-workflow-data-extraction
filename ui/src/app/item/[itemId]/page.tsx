@@ -25,7 +25,7 @@ export default function ItemPage() {
   // Use the hook to fetch item data
   const itemHookData = useItemData<MySchema>({
     // order/remove fields as needed here
-    jsonSchema: modifyJsonSchema(MyJsonSchema, {}),
+    jsonSchema: modifyJsonSchema(MyJsonSchema as any, {}),
     itemId: itemId as string,
     isMock: false,
     client: dataClient,

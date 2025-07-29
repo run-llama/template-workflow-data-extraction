@@ -55,12 +55,13 @@ export default function TriggerFileWorkflow({
   useEffect(() => {
     const lastEvent = wf.events[wf.events.length - 1];
     if (lastEvent?.type.endsWith("process_file.UIToast")) {
-      if (lastEvent.data.level === "info") {
-        toast.info(lastEvent.data.message);
-      } else if (lastEvent.data.level === "warning") {
-        toast.warning(lastEvent.data.message);
-      } else if (lastEvent.data.level === "error") {
-        toast.error(lastEvent.data.message);
+      const lastEventData = lastEvent.data as UIToast["data"];
+      if (lastEventData.level === "info") {
+        toast.info(lastEventData.message);
+      } else if (lastEventData.level === "warning") {
+        toast.warning(lastEventData.message);
+      } else if (lastEventData.level === "error") {
+        toast.error(lastEventData.message);
       }
     }
   }, [wf.events.length]);
