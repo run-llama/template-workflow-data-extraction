@@ -129,7 +129,7 @@ class ProcessFileWorkflow(Workflow):
                     extracted=extracted,
                     confidence=get_confidence(extracted_result),
                 )
-            except ValidationError as e:
+            except ValidationError:
                 return ExtractedInvalidEvent(
                     file_id=event.file_id,
                     file_path=event.file_path,

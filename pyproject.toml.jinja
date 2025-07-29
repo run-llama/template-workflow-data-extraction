@@ -23,6 +23,7 @@ dev = [
     "typescript>=0.0.12",
     "ty>=0.0.1a16",
     "pytest>=8.4.1",
+    "hatch>=1.14.1",
 ]
 
 [tool.uv.sources]
@@ -36,7 +37,7 @@ build-backend = "hatchling.build"
 format = "ruff format ."
 lint = [
     "ruff check .",
-    "ty ."
+    "ty check src"
 ]
 test = "pytest"
 all = [
