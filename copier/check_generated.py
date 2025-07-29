@@ -43,6 +43,14 @@ def main():
     
     click.echo(f"Working directory: {script_dir}")
     
+    # Check for uncommitted changes before starting
+    click.echo("Checking for uncommitted changes...")
+    git_status_check = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
+    if git_status_check.stdout.strip():
+        click.echo("Error: Repository has uncommitted changes. Please commit or stash them first.", err=True)
+        click.echo(git_status_check.stdout)
+        sys.exit(1)
+    
     # Delete the test-proj directory if it exists
     test_proj_dir = script_dir / "test-proj"
     if test_proj_dir.exists():
@@ -63,24 +71,23 @@ def main():
         unsafe=True
     )
     
-    # Show unstaged git changes
-    click.echo("\n" + "="*50)
-    click.echo("Git status:")
-    click.echo("="*50)
+    # Check if generated files match template
+    click.echo("\nChecking generated files against template...")
     git_status = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
-    if git_status.stdout.strip():
-        click.echo(git_status.stdout)
-    else:
-        click.echo("No changes detected")
     
-    click.echo("\n" + "="*50)
-    click.echo("Git diff:")
-    click.echo("="*50)
-    git_diff = run_git_command(["git", "diff"], cwd=script_dir)
-    if git_diff.stdout.strip():
+    if git_status.stdout.strip():
+        click.echo("\n❌ Generated files do not match template!", err=True)
+        click.echo("\nFiles that differ:")
+        click.echo(git_status.stdout)
+        
+        click.echo("\nDifferences:")
+        git_diff = run_git_command(["git", "diff"], cwd=script_dir)
         click.echo(git_diff.stdout)
+        
+        click.echo("\nTo fix: Update the template files to match the current test-proj output", err=True)
+        sys.exit(1)
     else:
-        click.echo("No diff output")
+        click.echo("✓ Generated files match template")
 
 
 if __name__ == "__main__":
