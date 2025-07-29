@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --experimental-build-mode compile",
     "start": "next start",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "format": "prettier --write",
+    "format:check": "prettier --check"
   },
   "dependencies": {
     "@babel/runtime": "^7.27.6",
@@ -30,7 +32,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5.5",
-    "prettier": "^3.5.3",
+    "prettier": "^3.6.2",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.8",
     "typescript": "^5"

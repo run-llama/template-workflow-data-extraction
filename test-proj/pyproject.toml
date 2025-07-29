@@ -19,7 +19,10 @@ export-types = "test_proj.export_types:export_types"
 [dependency-groups]
 dev = [
     "ruff>=0.11.10",
-    "llama_deploy"
+    "llama_deploy",
+    "typescript>=0.0.12",
+    "ty>=0.0.1a16",
+    "pytest>=8.4.1",
 ]
 
 [tool.uv.sources]
@@ -29,3 +32,16 @@ llama-cloud-services = { path = "../../llama_cloud_services" }
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.envs.default.scripts]
+format = "ruff format ."
+lint = [
+    "ruff check .",
+    "ty ."
+]
+test = "pytest"
+all = [
+    "format",
+    "lint",
+    "test"
+]
