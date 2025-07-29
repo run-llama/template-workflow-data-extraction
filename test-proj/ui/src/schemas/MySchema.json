@@ -1,0 +1,13 @@
+{
+  "properties": {
+    "hello": {
+      "title": "Hello",
+      "type": "string"
+    }
+  },
+  "required": [
+    "hello"
+  ],
+  "title": "MySchema",
+  "type": "object"
+}
