@@ -6,13 +6,15 @@
     "dev": "next dev --turbopack",
     "build": "next build --experimental-build-mode compile",
     "start": "next start",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "format": "prettier --write",
+    "format:check": "prettier --check"
   },
   "dependencies": {
     "@babel/runtime": "^7.27.6",
     "@lezer/highlight": "^1.2.1",
     "@llamaindex/chat-ui": "^0.5.16",
-    "@llamaindex/cloud": "file:../../../LlamaIndexTS/packages/cloud",
+    "@llamaindex/cloud": "^4.0.26",
     "@llamaindex/ui": "^0.3.2",
     "@radix-ui/themes": "^3.2.1",
     "class-variance-authority": "^0.7.1",
@@ -34,6 +36,5 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.8",
     "typescript": "^5"
-  },
-  "packageManager": "pnpm@10.11.1+sha512.e519b9f7639869dc8d5c3c5dfef73b3f091094b0a006d7317353c72b124e80e1afd429732e28705ad6bfa1ee879c1fce46c128ccebd3192101f43dd67c667912"
+  }
 }

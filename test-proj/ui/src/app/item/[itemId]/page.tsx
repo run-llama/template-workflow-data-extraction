@@ -25,7 +25,7 @@ export default function ItemPage() {
   // Use the hook to fetch item data
   const itemHookData = useItemData<MySchema>({
     // order/remove fields as needed here
-    jsonSchema: modifyJsonSchema(MyJsonSchema as any, {}),
+    jsonSchema: modifyJsonSchema(MyJsonSchema, {}),
     itemId: itemId as string,
     isMock: false,
     client: dataClient,
@@ -106,7 +106,12 @@ export default function ItemPage() {
           <FilePreview
             fileId={itemData.data.file_id}
             onBoundingBoxClick={(box, pageNumber) => {
-              console.log("Bounding box clicked:", box, "on page:", pageNumber);
+              console.log(
+                "Bounding box clicked:",
+                box,
+                "on page:",
+                pageNumber
+              );
             }}
           />
         )}
@@ -129,9 +134,7 @@ export default function ItemPage() {
           <ExtractedDataDisplay
             data={(data as Record<string, unknown>) || {}}
             confidence={
-              {
-                /** TODO: add confidence and page citations */
-              }
+              (itemData.data.confidence as Record<string, number>) || {}
             }
             title="Extracted Data"
             onChange={(updatedData) => {

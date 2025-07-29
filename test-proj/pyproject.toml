@@ -5,7 +5,7 @@ description = "Extracts data"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "llama-cloud-services",
+    "llama-cloud-services>=0.6.46",
     "llama-index-workflows>=1.1.0",
     "python-dotenv>=1.1.0",
     "jsonref>=1.1.0",
@@ -27,7 +27,6 @@ dev = [
 
 [tool.uv.sources]
 llama-deploy = { git = "https://github.com/run-llama/llama_deploy", rev = "main" }
-llama-cloud-services = { path = "../../llama_cloud_services" }
 
 [build-system]
 requires = ["hatchling"]
