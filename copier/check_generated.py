@@ -67,10 +67,7 @@ def main():
     click.echo("\n" + "="*50)
     click.echo("Git status:")
     click.echo("="*50)
-    git_status = run_git_command([
-        "git", "status", "--porcelain", "--", 
-        ".", ":(exclude)*.copier-answers.yml", ":(exclude)uv.lock"
-    ], cwd=script_dir)
+    git_status = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
     if git_status.stdout.strip():
         click.echo(git_status.stdout)
     else:
@@ -79,10 +76,7 @@ def main():
     click.echo("\n" + "="*50)
     click.echo("Git diff:")
     click.echo("="*50)
-    git_diff = run_git_command([
-        "git", "diff", "--", 
-        ".", ":(exclude)*.copier-answers.yml", ":(exclude)uv.lock"
-    ], cwd=script_dir)
+    git_diff = run_git_command(["git", "diff"], cwd=script_dir)
     if git_diff.stdout.strip():
         click.echo(git_diff.stdout)
     else:
