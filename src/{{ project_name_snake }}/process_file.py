@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -7,9 +8,8 @@ from typing import Any, Literal
 
 import httpx
 from llama_cloud import ExtractRun
-from pydantic import ValidationError
 from llama_cloud_services.extract import SourceText
-from llama_cloud_services.beta.agent_data import ExtractedData
+from llama_cloud_services.beta.agent_data import ExtractedData, InvalidExtractionData
 from workflows import Context, Workflow, step
 from workflows.events import Event, StartEvent, StopEvent
 from workflows.retry_policy import ConstantDelayRetryPolicy
@@ -40,19 +40,11 @@ class UIToast(Event):
 
 
 class ExtractedEvent(Event):
-    file_id: str
-    file_path: str
-    filename: str
-    extracted: MySchema
-    confidence: dict[str, dict | float]
+    data: ExtractedData[MySchema]
 
 
 class ExtractedInvalidEvent(Event):
-    file_id: str
-    file_path: str
-    filename: str
-    extracted: dict[str, Any]
-    confidence: dict[str, dict | float]
+    data: ExtractedData[dict[str, Any]]
 
 
 class ProcessFileWorkflow(Workflow):
@@ -69,6 +61,7 @@ class ProcessFileWorkflow(Workflow):
     async def download_file(
         self, event: DownloadFileEvent, ctx: Context
     ) -> FileDownloadedEvent:
+        """Download the file reference from the cloud storage"""
         try:
             file_metadata = await get_llama_cloud_client().files.get_file(
                 id=event.file_id
@@ -106,8 +99,12 @@ class ProcessFileWorkflow(Workflow):
     async def process_file(
         self, event: FileDownloadedEvent, ctx: Context
     ) -> ExtractedEvent | ExtractedInvalidEvent:
+        """Runs the extraction against the file"""
         try:
             agent = get_extract_agent()
+            # track the content of the file, so as to be able to de-duplicate
+            file_content = Path(event.file_path).read_bytes()
+            file_hash = hashlib.sha256(file_content).hexdigest()
             source_text = SourceText(
                 file=event.file_path,
                 filename=event.filename,
@@ -121,22 +118,15 @@ class ProcessFileWorkflow(Workflow):
             extracted_result: ExtractRun = await agent.aextract(source_text)
             try:
                 logger.info(f"Extracted data: {extracted_result}")
-                extracted = MySchema.model_validate(extracted_result.data)
-                return ExtractedEvent(
-                    file_id=event.file_id,
-                    file_path=event.file_path,
-                    filename=event.filename,
-                    extracted=extracted,
-                    confidence=get_confidence(extracted_result),
+                data = ExtractedData.from_extraction_result(
+                    result=extracted_result,
+                    schema=MySchema,
+                    file_hash=file_hash,
                 )
-            except ValidationError:
-                return ExtractedInvalidEvent(
-                    file_id=event.file_id,
-                    file_path=event.file_path,
-                    filename=event.filename,
-                    extracted=extracted_result.data,
-                    confidence=get_confidence(extracted_result),
-                )
+                return ExtractedEvent(data=data)
+            except InvalidExtractionData as e:
+                logger.error(f"Error validating extracted data: {e}", exc_info=True)
+                return ExtractedInvalidEvent(data=e.invalid_item)
         except Exception as e:
             logger.error(
                 f"Error extracting data from file {event.filename}: {e}",
@@ -154,57 +144,51 @@ class ProcessFileWorkflow(Workflow):
     async def record_extracted_data(
         self, event: ExtractedEvent | ExtractedInvalidEvent, ctx: Context
     ) -> StopEvent:
+        """Records the extracted data to the agent data API"""
         try:
-            logger.info(f"Recorded extracted data for file {event.filename}")
+            logger.info(f"Recorded extracted data for file {event.data.file_name}")
             ctx.write_event_to_stream(
                 UIToast(
                     level="info",
-                    message=f"Recorded extracted data for file {event.filename}",
+                    message=f"Recorded extracted data for file {event.data.file_name}",
                 )
             )
-            item_id = await get_data_client().create_item(
-                ExtractedData.create(
-                    data=event.extracted,
-                    status="pending_review"
-                    if isinstance(event, ExtractedEvent)
-                    else "error",
-                    file_id=event.file_id,
-                    file_name=event.filename,
-                    file_hash=event.file_path,
-                    confidence=event.confidence,
+            # remove past data when reprocessing the same file
+            if event.data.file_hash:
+                existing_data = await get_data_client().search(
+                    filter={
+                        "file_hash": {
+                            "eq": event.data.file_hash,
+                        },
+                    },
                 )
-            )
+                if existing_data.items:
+                    logger.info(
+                        f"Removing past data for file {event.data.file_name} with hash {event.data.file_hash}"
+                    )
+                    await asyncio.gather(
+                        *[
+                            get_data_client().delete_item(item.id)
+                            for item in existing_data.items
+                        ]
+                    )
+            # finally, save the new data
+            item_id = await get_data_client().create_item(event.data)
             return StopEvent(
                 result=item_id.id,
             )
         except Exception as e:
             logger.error(
-                f"Error recording extracted data for file {event.filename}: {e}",
+                f"Error recording extracted data for file {event.data.file_name}: {e}",
                 exc_info=True,
             )
             ctx.write_event_to_stream(
                 UIToast(
                     level="error",
-                    message=f"Error recording extracted data for file {event.filename}: {e}",
+                    message=f"Error recording extracted data for file {event.data.file_name}: {e}",
                 )
             )
             raise e
-
-
-# extraction_metadata={'field_metadata': {'hello': {'citation': [{'page': 1, 'matching_text': '# Invoice Summary'}], 'extraction_confidence': 0.01, 'confidence': 0.01}, 'nested': {'foo': {'citation': [{'page': 1, 'matching_text': 'LINCOLNSHIRE AND DISTRICT MEDICAL SERVICES LTD'}], 'extraction_confidence': 0.01, 'confidence': 0.01}, 'bar': {'citation': [{'page': 1, 'matching_text': 'BEV/WITH/BRID HOSP COVER FEB 17'}], 'extraction_confidence': 0.01, 'confidence': 0.01}}}, 'usage': {'num_pages_extracted': 1, 'num_document_tokens': 364, 'num_output_tokens': 112}}
-def get_confidence(extract_run: ExtractRun) -> dict[str, dict | float]:
-    return get_confidence_recursive(extract_run.extraction_metadata["field_metadata"])
-
-
-def get_confidence_recursive(metadata: dict[str, Any]) -> dict[str, dict | float]:
-    response = {}
-    for key, value in metadata.items():
-        assert isinstance(value, dict)
-        if "confidence" in value:
-            response[key] = value["confidence"]
-        else:
-            response[key] = get_confidence_recursive(value)
-    return response
 
 
 workflow = ProcessFileWorkflow(timeout=None)
