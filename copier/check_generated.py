@@ -11,11 +11,12 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional, List
 import click
 import copier
 
 
-def run_git_command(cmd, cwd=None):
+def run_git_command(cmd: List[str], cwd: Optional[Path] = None) -> subprocess.CompletedProcess[str]:
     """Run a git command and return the result."""
     click.echo(f"Running: {' '.join(cmd)}")
     try:
@@ -30,47 +31,49 @@ def run_git_command(cmd, cwd=None):
         sys.exit(1)
 
 
-def fix_template_from_materialized(script_dir, revision):
+def fix_template_from_materialized(script_dir: Path, revision: str) -> None:
     """Fix template files by copying back files changed since revision from materialized test-proj."""
-    test_proj_dir = script_dir / "test-proj"
-    
+    test_proj_dir: Path = script_dir / "test-proj"
+
     # Get list of files changed since the specified revision in test-proj
-    git_diff_name_only = run_git_command([
-        "git", "diff", "--name-only", revision, "--", "test-proj/"
-    ], cwd=script_dir)
-    
+    git_diff_name_only: subprocess.CompletedProcess[str] = run_git_command(
+        ["git", "diff", "--name-only", revision, "--", "test-proj/"], cwd=script_dir
+    )
+
     if not git_diff_name_only.stdout.strip():
         click.echo(f"No changes in test-proj since {revision}")
         return
-    
-    changed_files = git_diff_name_only.stdout.strip().split("\n")
-    
+
+    changed_files: List[str] = git_diff_name_only.stdout.strip().split("\n")
+
     for file_path in changed_files:
         # Remove test-proj/ prefix to get relative path within the project
         if not file_path.startswith("test-proj/"):
             continue
-        
-        relative_path = file_path[len("test-proj/"):]
-        materialized_file = script_dir / file_path
-        
+
+        relative_path: str = file_path[len("test-proj/") :]
+        materialized_file: Path = script_dir / file_path
+
         # Skip files that don't exist (deleted files)
         if not materialized_file.exists():
             click.echo(f"Skipping deleted file: {relative_path}")
             continue
-        
+
         # Handle template path mapping
-        template_file_path = map_materialized_to_template_path(script_dir, relative_path)
-        template_file = script_dir / template_file_path
-        
+        template_file_path: str = map_materialized_to_template_path(
+            script_dir, relative_path
+        )
+        template_file: Path = script_dir / template_file_path
+
         if template_file_path.endswith(".jinja"):
             # Show warning for .jinja files that need manual resolution
             click.echo(f"⚠️  Manual resolution required: {template_file_path}")
             click.echo(f"   Materialized file: {relative_path}")
-            
+
             # Show diff for just this file since the revision
-            git_diff = run_git_command([
-                "git", "diff", revision, "--", file_path
-            ], cwd=script_dir)
+            git_diff: subprocess.CompletedProcess[str] = run_git_command(
+                ["git", "diff", revision, "--", file_path], cwd=script_dir
+            )
             if git_diff.stdout.strip():
                 click.echo("   Changes since revision:")
                 for diff_line in git_diff.stdout.split("\n"):
@@ -83,24 +86,24 @@ def fix_template_from_materialized(script_dir, revision):
             shutil.copy2(materialized_file, template_file)
 
 
-def map_materialized_to_template_path(script_dir, materialized_path):
+def map_materialized_to_template_path(script_dir: Path, materialized_path: str) -> str:
     """Map a materialized file path back to its template path."""
-    path_parts = Path(materialized_path).parts
+    path_parts: tuple[str, ...] = Path(materialized_path).parts
 
     # Handle the special case of src/test_proj/ → src/{{ project_name_snake }}/
     if len(path_parts) >= 2 and path_parts[0] == "src" and path_parts[1] == "test_proj":
         # Replace test_proj with the template variable
-        new_parts = ("src", "{{ project_name_snake }}") + path_parts[2:]
-        template_path = str(Path(*new_parts))
+        new_parts: tuple[str, ...] = ("src", "{{ project_name_snake }}") + path_parts[2:]
+        template_path: str = str(Path(*new_parts))
 
         # Check if a .jinja version exists
-        jinja_path = template_path + ".jinja"
+        jinja_path: str = template_path + ".jinja"
         if (script_dir / jinja_path).exists():
             return jinja_path
         return template_path
 
     # For other paths, check if .jinja version exists
-    jinja_path = materialized_path + ".jinja"
+    jinja_path: str = materialized_path + ".jinja"
     if (script_dir / jinja_path).exists():
         return jinja_path
 
@@ -108,15 +111,15 @@ def map_materialized_to_template_path(script_dir, materialized_path):
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """Template validation and fixing tools."""
     pass
 
 
-def regenerate_test_proj(script_dir):
+def regenerate_test_proj(script_dir: Path) -> None:
     """Regenerate the test-proj directory using copier."""
     # Delete the test-proj directory if it exists
-    test_proj_dir = script_dir / "test-proj"
+    test_proj_dir: Path = script_dir / "test-proj"
     if test_proj_dir.exists():
         click.echo(f"Deleting {test_proj_dir}")
         shutil.rmtree(test_proj_dir)
@@ -134,17 +137,17 @@ def regenerate_test_proj(script_dir):
 
 
 @cli.command()
-def regenerate():
+def regenerate() -> None:
     """Regenerate test-proj directory using copier."""
     # Get the parent directory of this script (go up from copier/ to project root)
-    script_dir = Path(__file__).parent.parent
+    script_dir: Path = Path(__file__).parent.parent
     os.chdir(script_dir)
 
     click.echo(f"Working directory: {script_dir}")
 
     # Check for uncommitted changes before starting
     click.echo("Checking for uncommitted changes...")
-    git_status_check = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
+    git_status_check: subprocess.CompletedProcess[str] = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
     if git_status_check.stdout.strip():
         click.echo(
             "Error: Repository has uncommitted changes. Please commit or stash them first.",
@@ -158,23 +161,27 @@ def regenerate():
 
 
 @cli.command()
-def check():
+def check_regeneration() -> None:
     """Check if generated files match template (assumes test-proj already exists)."""
     # Get the parent directory of this script (go up from copier/ to project root)
-    script_dir = Path(__file__).parent.parent
+    script_dir: Path = Path(__file__).parent.parent
     os.chdir(script_dir)
 
+    regenerate_test_proj(script_dir)
     click.echo(f"Working directory: {script_dir}")
 
     # Check if test-proj exists
-    test_proj_dir = script_dir / "test-proj"
+    test_proj_dir: Path = script_dir / "test-proj"
     if not test_proj_dir.exists():
-        click.echo("Error: test-proj directory does not exist. Run 'regenerate' first.", err=True)
+        click.echo(
+            "Error: test-proj directory does not exist. Run 'regenerate' first.",
+            err=True,
+        )
         sys.exit(1)
 
     # Check if generated files match template
     click.echo("Checking generated files against template...")
-    git_status = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
+    git_status: subprocess.CompletedProcess[str] = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
 
     if git_status.stdout.strip():
         click.echo("\n❌ Generated files do not match template!", err=True)
@@ -182,7 +189,7 @@ def check():
         click.echo(git_status.stdout)
 
         click.echo("\nDifferences:")
-        git_diff = run_git_command(["git", "diff"], cwd=script_dir)
+        git_diff: subprocess.CompletedProcess[str] = run_git_command(["git", "diff"], cwd=script_dir)
         click.echo(git_diff.stdout)
 
         click.echo(
@@ -196,10 +203,10 @@ def check():
 
 @cli.command()
 @click.argument("revision")
-def fix(revision):
+def fix_template(revision: str) -> None:
     """Fix template files by copying back files changed since REVISION from materialized test-proj."""
     # Get the parent directory of this script (go up from copier/ to project root)
-    script_dir = Path(__file__).parent.parent
+    script_dir: Path = Path(__file__).parent.parent
     os.chdir(script_dir)
 
     click.echo(f"Working directory: {script_dir}")
@@ -211,21 +218,13 @@ def fix(revision):
         click.echo(f"Error: Revision '{revision}' not found", err=True)
         sys.exit(1)
 
-    # Check for uncommitted changes before starting
-    click.echo("Checking for uncommitted changes...")
-    git_status_check = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
-    if git_status_check.stdout.strip():
+    # Check if test-proj exists
+    test_proj_dir: Path = script_dir / "test-proj"
+    if not test_proj_dir.exists():
         click.echo(
-            "Error: Repository has uncommitted changes. Please commit or stash them first.",
+            "Error: test-proj directory does not exist. Run 'regenerate' first.",
             err=True,
         )
-        click.echo(git_status_check.stdout)
-        sys.exit(1)
-
-    # Check if test-proj exists
-    test_proj_dir = script_dir / "test-proj"
-    if not test_proj_dir.exists():
-        click.echo("Error: test-proj directory does not exist. Run 'regenerate' first.", err=True)
         sys.exit(1)
 
     # Fix template files based on changes since revision
