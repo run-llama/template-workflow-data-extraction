@@ -37,7 +37,7 @@ build-backend = "hatchling.build"
 format = "ruff format ."
 lint = [
     "ruff check .",
-    "ty ."
+    "ty check src"
 ]
 test = "pytest"
 all = [
