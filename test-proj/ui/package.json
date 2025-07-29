@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "format": "prettier --write",
-    "format:check": "prettier --check"
+    "format:check": "prettier --check",
+    "all": "pnpm i && pnpm run lint && pnpm run format:check && pnpm run build"
   },
   "dependencies": {
     "@babel/runtime": "^7.27.6",

@@ -16,7 +16,9 @@ import click
 import copier
 
 
-def run_git_command(cmd: List[str], cwd: Optional[Path] = None) -> subprocess.CompletedProcess[str]:
+def run_git_command(
+    cmd: List[str], cwd: Optional[Path] = None
+) -> subprocess.CompletedProcess[str]:
     """Run a git command and return the result."""
     click.echo(f"Running: {' '.join(cmd)}")
     try:
@@ -33,7 +35,6 @@ def run_git_command(cmd: List[str], cwd: Optional[Path] = None) -> subprocess.Co
 
 def fix_template_from_materialized(script_dir: Path, revision: str) -> None:
     """Fix template files by copying back files changed since revision from materialized test-proj."""
-    test_proj_dir: Path = script_dir / "test-proj"
 
     # Get list of files changed since the specified revision in test-proj
     git_diff_name_only: subprocess.CompletedProcess[str] = run_git_command(
@@ -93,7 +94,9 @@ def map_materialized_to_template_path(script_dir: Path, materialized_path: str) 
     # Handle the special case of src/test_proj/ → src/{{ project_name_snake }}/
     if len(path_parts) >= 2 and path_parts[0] == "src" and path_parts[1] == "test_proj":
         # Replace test_proj with the template variable
-        new_parts: tuple[str, ...] = ("src", "{{ project_name_snake }}") + path_parts[2:]
+        new_parts: tuple[str, ...] = ("src", "{{ project_name_snake }}") + path_parts[
+            2:
+        ]
         template_path: str = str(Path(*new_parts))
 
         # Check if a .jinja version exists
@@ -136,18 +139,36 @@ def regenerate_test_proj(script_dir: Path) -> None:
     )
 
 
+def get_script_dir_and_setup() -> Path:
+    """Get the script directory and set up working directory. Common setup for all commands."""
+    script_dir: Path = Path(__file__).parent.parent
+    os.chdir(script_dir)
+    click.echo(f"Working directory: {script_dir}")
+    return script_dir
+
+
+def ensure_test_proj_exists(script_dir: Path) -> Path:
+    """Ensure test-proj directory exists and return its path."""
+    test_proj_dir: Path = script_dir / "test-proj"
+    if not test_proj_dir.exists():
+        click.echo(
+            "Error: test-proj directory does not exist. Run 'regenerate' first.",
+            err=True,
+        )
+        sys.exit(1)
+    return test_proj_dir
+
+
 @cli.command()
 def regenerate() -> None:
     """Regenerate test-proj directory using copier."""
-    # Get the parent directory of this script (go up from copier/ to project root)
-    script_dir: Path = Path(__file__).parent.parent
-    os.chdir(script_dir)
-
-    click.echo(f"Working directory: {script_dir}")
+    script_dir: Path = get_script_dir_and_setup()
 
     # Check for uncommitted changes before starting
     click.echo("Checking for uncommitted changes...")
-    git_status_check: subprocess.CompletedProcess[str] = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
+    git_status_check: subprocess.CompletedProcess[str] = run_git_command(
+        ["git", "status", "--porcelain"], cwd=script_dir
+    )
     if git_status_check.stdout.strip():
         click.echo(
             "Error: Repository has uncommitted changes. Please commit or stash them first.",
@@ -163,25 +184,15 @@ def regenerate() -> None:
 @cli.command()
 def check_regeneration() -> None:
     """Check if generated files match template (assumes test-proj already exists)."""
-    # Get the parent directory of this script (go up from copier/ to project root)
-    script_dir: Path = Path(__file__).parent.parent
-    os.chdir(script_dir)
+    script_dir: Path = get_script_dir_and_setup()
 
     regenerate_test_proj(script_dir)
-    click.echo(f"Working directory: {script_dir}")
-
-    # Check if test-proj exists
-    test_proj_dir: Path = script_dir / "test-proj"
-    if not test_proj_dir.exists():
-        click.echo(
-            "Error: test-proj directory does not exist. Run 'regenerate' first.",
-            err=True,
-        )
-        sys.exit(1)
 
     # Check if generated files match template
     click.echo("Checking generated files against template...")
-    git_status: subprocess.CompletedProcess[str] = run_git_command(["git", "status", "--porcelain"], cwd=script_dir)
+    git_status: subprocess.CompletedProcess[str] = run_git_command(
+        ["git", "status", "--porcelain"], cwd=script_dir
+    )
 
     if git_status.stdout.strip():
         click.echo("\n❌ Generated files do not match template!", err=True)
@@ -189,7 +200,9 @@ def check_regeneration() -> None:
         click.echo(git_status.stdout)
 
         click.echo("\nDifferences:")
-        git_diff: subprocess.CompletedProcess[str] = run_git_command(["git", "diff"], cwd=script_dir)
+        git_diff: subprocess.CompletedProcess[str] = run_git_command(
+            ["git", "diff"], cwd=script_dir
+        )
         click.echo(git_diff.stdout)
 
         click.echo(
@@ -201,15 +214,44 @@ def check_regeneration() -> None:
         click.echo("✓ Generated files match template")
 
 
+@cli.command("check-python")
+def check_python() -> None:
+    """Run Python validation checks on test-proj using hatch."""
+    script_dir: Path = get_script_dir_and_setup()
+    test_proj_dir: Path = ensure_test_proj_exists(script_dir)
+
+    # Run Python checks with hatch
+    click.echo("Running Python validation checks...")
+    run_git_command(["uv", "run", "hatch", "run", "all"], cwd=test_proj_dir)
+    click.echo("✓ Python checks passed")
+
+
+@cli.command("check-typescript")
+def check_typescript() -> None:
+    """Run TypeScript validation checks on test-proj/ui using pnpm."""
+    script_dir: Path = get_script_dir_and_setup()
+    test_proj_dir: Path = ensure_test_proj_exists(script_dir)
+    ui_dir: Path = test_proj_dir / "ui"
+
+    # Check if ui directory exists
+    if not ui_dir.exists():
+        click.echo(
+            "Error: test-proj/ui directory does not exist.",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Run TypeScript checks with pnpm
+    click.echo("Running TypeScript validation checks...")
+    run_git_command(["pnpm", "run", "all"], cwd=ui_dir)
+    click.echo("✓ TypeScript checks passed")
+
+
 @cli.command()
 @click.argument("revision")
 def fix_template(revision: str) -> None:
     """Fix template files by copying back files changed since REVISION from materialized test-proj."""
-    # Get the parent directory of this script (go up from copier/ to project root)
-    script_dir: Path = Path(__file__).parent.parent
-    os.chdir(script_dir)
-
-    click.echo(f"Working directory: {script_dir}")
+    script_dir: Path = get_script_dir_and_setup()
 
     # Validate that the revision exists
     try:
@@ -219,13 +261,7 @@ def fix_template(revision: str) -> None:
         sys.exit(1)
 
     # Check if test-proj exists
-    test_proj_dir: Path = script_dir / "test-proj"
-    if not test_proj_dir.exists():
-        click.echo(
-            "Error: test-proj directory does not exist. Run 'regenerate' first.",
-            err=True,
-        )
-        sys.exit(1)
+    ensure_test_proj_exists(script_dir)
 
     # Fix template files based on changes since revision
     fix_template_from_materialized(script_dir, revision)
