@@ -17,27 +17,36 @@ from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 import click
 import copier
+from copier._main import Worker  # Private API but essential for computed variables
 import yaml
 
 
 def parse_template_variables() -> Dict[str, str]:
-    """Parse template variables from answers file or use hardcoded fallback."""
+    """Parse template variables using Copier's Worker to get computed values."""
     script_dir = Path(__file__).parent.parent
-
-    # Try to get variables from existing answers file first
+    
+    # Read answers from existing materialized project
     test_proj = script_dir / "test-proj"
     answers_file = test_proj / ".copier-answers.yml"
-
-    if answers_file.exists():
-
-        with open(answers_file, "r") as f:
-            answers_data = yaml.safe_load(f)
-            # Filter out copier metadata and return user answers
-            user_answers = {
-                k: v for k, v in answers_data.items() if not k.startswith("_")
-            }
-
-            return user_answers
+    
+    with open(answers_file, "r") as f:
+        answers_data = yaml.safe_load(f)
+        # Filter out copier metadata
+        user_answers = {
+            k: v for k, v in answers_data.items() if not k.startswith("_")
+        }
+    
+    # Use Worker to get ALL variables (including computed ones like project_name_snake)
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        with Worker(
+            src_path=str(script_dir),
+            dst_path=tmp_dir,
+            data=user_answers,
+            quiet=True
+        ) as worker:
+            # Worker.data contains all variables after Copier computes them
+            return dict(worker.data)
 
 
 def find_simple_jinja_patterns(template_line: str) -> List[Tuple[str, str]]:
@@ -510,6 +519,21 @@ def compare_with_expected_materialized(
 
 def map_materialized_to_template_path(script_dir: Path, materialized_path: str) -> str:
     """Map a materialized file path back to its template path."""
+    path_parts: tuple[str, ...] = Path(materialized_path).parts
+
+    # Handle the special case of src/{computed_name}/ → src/{{ project_name_snake }}/
+    variables = parse_template_variables()
+    project_name_snake = variables.get("project_name_snake", "test_proj")
+    if len(path_parts) >= 2 and path_parts[0] == "src" and path_parts[1] == project_name_snake:
+        # Replace computed name with the template variable
+        new_parts: tuple[str, ...] = ("src", "{{ project_name_snake }}") + path_parts[2:]
+        template_path: str = str(Path(*new_parts))
+
+        # Check if a .jinja version exists
+        jinja_path: str = template_path + ".jinja"
+        if (script_dir / jinja_path).exists():
+            return jinja_path
+        return template_path
 
     # For other paths, check if .jinja version exists
     jinja_path: str = materialized_path + ".jinja"
