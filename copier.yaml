@@ -25,3 +25,4 @@ _exclude:
   - ".github"
   - "copier"
   - "CONTRIBUTING.md"
+  - "copier.yaml"

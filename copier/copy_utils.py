@@ -269,15 +269,7 @@ def run_git_command(
         sys.exit(1)
 
 
-def get_merge_base_with_main(script_dir: Path) -> str:
-    """Get merge base with main as default revision."""
-    try:
-        result = run_git_command(["git", "merge-base", "HEAD", "main"], cwd=script_dir)
-        return result.stdout.strip()
-    except subprocess.CalledProcessError:
-        # Fallback to main if merge-base fails
-        click.echo("Warning: Could not determine merge base with main, using 'main'")
-        return "main"
+
 
 
 def get_git_tracked_files(directory: Path, respect_gitignore: bool = True) -> set[Path]:
@@ -539,58 +531,7 @@ def compare_with_expected_materialized(
                     click.echo(f"  {materialized_path} → {template_path}")
 
 
-def fix_template_from_materialized(script_dir: Path, revision: str) -> None:
-    """Fix template files by copying back files changed since revision from materialized test-proj."""
 
-    # Get list of files changed since the specified revision in test-proj
-    git_diff_name_only: subprocess.CompletedProcess[str] = run_git_command(
-        ["git", "diff", "--name-only", revision, "--", "test-proj/"], cwd=script_dir
-    )
-
-    if not git_diff_name_only.stdout.strip():
-        click.echo(f"No changes in test-proj since {revision}")
-        return
-
-    changed_files: List[str] = git_diff_name_only.stdout.strip().split("\n")
-
-    for file_path in changed_files:
-        # Remove test-proj/ prefix to get relative path within the project
-        if not file_path.startswith("test-proj/"):
-            continue
-
-        relative_path: str = file_path[len("test-proj/") :]
-        materialized_file: Path = script_dir / file_path
-
-        # Skip files that don't exist (deleted files)
-        if not materialized_file.exists():
-            click.echo(f"Skipping deleted file: {relative_path}")
-            continue
-
-        # Handle template path mapping
-        template_file_path: str = map_materialized_to_template_path(
-            script_dir, relative_path
-        )
-        template_file: Path = script_dir / template_file_path
-
-        if template_file_path.endswith(".jinja"):
-            # Show warning for .jinja files that need manual resolution
-            click.echo(f"⚠️  Manual resolution required: {template_file_path}")
-            click.echo(f"   Materialized file: {relative_path}")
-
-            # Show diff for just this file since the revision
-            git_diff: subprocess.CompletedProcess[str] = run_git_command(
-                ["git", "diff", revision, "--", file_path], cwd=script_dir
-            )
-            if git_diff.stdout.strip():
-                click.echo("   Changes since revision:")
-                for diff_line in git_diff.stdout.split("\n"):
-                    click.echo(f"   {diff_line}")
-            click.echo()
-        else:
-            # Copy non-templated files back
-            click.echo(f"Copying {relative_path} → {template_file_path}")
-            template_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(materialized_file, template_file)
 
 
 def map_materialized_to_template_path(script_dir: Path, materialized_path: str) -> str:
@@ -759,51 +700,24 @@ def check_javascript(fix: bool) -> None:
 
 
 @cli.command()
-@click.argument("revision", required=False)
 @click.option(
-    "--legacy-mode",
+    "--check",
     is_flag=True,
-    help="Use legacy git-diff based approach instead of expected materialized comparison.",
+    help="Show differences without making changes.",
 )
-@click.option(
-    "--fix",
-    is_flag=True,
-    help="Automatically copy non-templated files back to template.",
-)
-def fix_template(revision: Optional[str], legacy_mode: bool, fix: bool) -> None:
+def fix_template(check: bool) -> None:
     """Fix template files by copying back changes from materialized test-proj.
 
-    By default, compares test-proj with what the current template would generate.
-    REVISION is optional and defaults to merge-base with main when using legacy mode.
+    Compares test-proj with what the current template would generate and fixes differences.
+    Use --check to preview changes without applying them.
     """
     script_dir: Path = get_script_dir_and_setup()
 
     # Check if test-proj exists
     ensure_test_proj_exists(script_dir)
 
-    if legacy_mode:
-        # Use the original git-diff based approach
-        if revision is None:
-            revision = get_merge_base_with_main(script_dir)
-            click.echo(f"Using auto-detected revision: {revision}")
-
-        # Validate that the revision exists
-        try:
-            run_git_command(["git", "rev-parse", "--verify", revision], cwd=script_dir)
-        except subprocess.CalledProcessError:
-            click.echo(f"Error: Revision '{revision}' not found", err=True)
-            sys.exit(1)
-
-        # Fix template files based on changes since revision
-        fix_template_from_materialized(script_dir, revision)
-    else:
-        # Use new expected materialized comparison approach
-        if revision is not None:
-            click.echo(
-                "Warning: revision argument ignored when not using --legacy-mode"
-            )
-
-        compare_with_expected_materialized(script_dir, check_mode=not fix)
+    # Use expected materialized comparison approach
+    compare_with_expected_materialized(script_dir, check_mode=check)
 
 
 if __name__ == "__main__":

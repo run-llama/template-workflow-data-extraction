@@ -32,7 +32,7 @@ Run validation checks to ensure your changes are correct before propagating them
 # From the project root directory
 ./copier/copy_utils.py check-python
 # or within test-proj/, run `uv run hatch run all` or the individual script commands, such as `uv run hatch run format`
-./copier/copy_utils.py check-typescript
+./copier/copy_utils.py check-javascript
 # or within test-proj/ui/, run `pnpm run all`, or the individual script commands such as `pnpm run format`
 ```
 
@@ -47,23 +47,32 @@ git commit -m "WIP: Implement new feature in test-proj"
 
 ### 4. Propagate Changes to the Template
 
-Use the `fix_template` command to automatically copy your changes from `test-proj` back into the template source files. The command compares the current state of `test-proj` against a reference commit. Usually what you want is  the fork point of your branch with main. You can also selectively push just from e.g. the last commit
+Use the `fix-template` command to automatically copy your changes from `test-proj` back into the template source files. The enhanced command compares your current `test-proj` against what the current template would generate, showing only meaningful differences.
 
 ```bash
-# Use HEAD~1 to compare against the previous commit
-./copier/copy_utils.py fix_template main
+# Check what would change (recommended first step)
+./copier/copy_utils.py fix-template --check
+
+# Apply changes automatically
+./copier/copy_utils.py fix-template
 ```
 
-- **Automatic Copying**: The script automatically copies new or modified non-templated files to their correct destination in the template structure.
-- **Manual Resolution**: The script cannot automatically resolve changes in templated Jinja files (`.jinja`). For these, it will print a warning and a `diff` of the changes.
+The enhanced `fix-template` provides:
 
-### 5. Manually Update `.jinja` Files
+- **Smart Comparison**: Compares against freshly generated template output, eliminating false positives
+- **Automatic Jinja Resolution**: Automatically resolves simple template variable changes (project names, versions, etc.)
+- **Gitignore Respect**: Only considers files that would be tracked by git, ignoring build artifacts
+- **Selective Copying**: Copies non-templated files and auto-resolved template files back to the template
 
-For each `.jinja` file flagged by the script in the previous step, you must manually transfer the logic.
+### 5. Handle Remaining Manual Updates
 
-1.  Open the modified file in `test-proj` (e.g., `test-proj/pyproject.toml`).
-2.  Open the corresponding template file (e.g., `pyproject.toml.jinja`).
-3.  Carefully apply the changes, ensuring you retain or add the necessary Jinja templating logic.
+For complex `.jinja` files that couldn't be auto-resolved, you'll need manual intervention:
+
+1. Open the modified file in `test-proj` (e.g., `test-proj/pyproject.toml`)
+2. Open the corresponding template file (e.g., `pyproject.toml.jinja`)
+3. Carefully apply the changes, ensuring you retain or add the necessary Jinja templating logic
+
+The tool will clearly indicate which files need manual resolution.
 
 ### 6. Verify Template Integrity
 
