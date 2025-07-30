@@ -45,23 +45,61 @@ def get_merge_base_with_main(script_dir: Path) -> str:
         return "main"
 
 
+def get_git_tracked_files(directory: Path, respect_gitignore: bool = True) -> set[Path]:
+    """Get set of files that would be tracked by git (optionally respecting gitignore)."""
+    
+    # Files to always ignore
+    ignored_files = {".copier-answers.yml"}
+    
+    if not respect_gitignore:
+        # Just return all files, excluding ignored ones
+        tracked_files = set()
+        for file_path in directory.rglob("*"):
+            if file_path.is_file():
+                relative_path = file_path.relative_to(directory)
+                if relative_path.name not in ignored_files:
+                    tracked_files.add(relative_path)
+        return tracked_files
+    
+    try:
+        # Use git ls-files to get files that git would track
+        # This respects .gitignore rules
+        result = subprocess.run(
+            ["git", "ls-files", "--others", "--cached", "--exclude-standard"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        tracked_files = set()
+        for line in result.stdout.strip().split('\n'):
+            if line.strip():
+                file_path = directory / line.strip()
+                relative_path = Path(line.strip())
+                if file_path.is_file() and relative_path.name not in ignored_files:
+                    tracked_files.add(relative_path)
+        
+        return tracked_files
+    except subprocess.CalledProcessError:
+        # Fallback: for temp directories (expected), don't respect gitignore
+        # For actual directories, warn and use all files
+        if "expected" in str(directory):
+            return get_git_tracked_files(directory, respect_gitignore=False)
+        else:
+            click.echo("Warning: Could not determine git-tracked files, using all files")
+            return get_git_tracked_files(directory, respect_gitignore=False)
+
+
 def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
-    """Compare two directories and return list of files that differ."""
+    """Compare two directories and return list of files that differ, respecting gitignore."""
     differences = []
     
-    # Get all files in both directories
-    expected_files = set()
-    actual_files = set()
-    
-    if expected_dir.exists():
-        for file_path in expected_dir.rglob("*"):
-            if file_path.is_file():
-                expected_files.add(file_path.relative_to(expected_dir))
-    
-    if actual_dir.exists():
-        for file_path in actual_dir.rglob("*"):
-            if file_path.is_file():
-                actual_files.add(file_path.relative_to(actual_dir))
+    # Get files in both directories
+    # For expected (temp) directory: get all files (no gitignore)
+    # For actual directory: respect gitignore
+    expected_files = get_git_tracked_files(expected_dir, respect_gitignore=False) if expected_dir.exists() else set()
+    actual_files = get_git_tracked_files(actual_dir, respect_gitignore=True) if actual_dir.exists() else set()
     
     # Check for files only in expected
     for file_path in expected_files - actual_files:
@@ -78,9 +116,9 @@ def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
         
         # Compare file contents
         try:
-            with open(expected_file, 'r', encoding='utf-8') as f:
+            with open(expected_file, "r", encoding="utf-8") as f:
                 expected_content = f.read()
-            with open(actual_file, 'r', encoding='utf-8') as f:
+            with open(actual_file, "r", encoding="utf-8") as f:
                 actual_content = f.read()
             
             if expected_content != actual_content:
@@ -93,13 +131,15 @@ def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
     return differences
 
 
-def compare_with_expected_materialized(script_dir: Path) -> None:
+def compare_with_expected_materialized(
+    script_dir: Path, check_mode: bool = False
+) -> None:
     """Compare current test-proj with freshly generated template."""
     click.echo("Generating expected materialized version from current template...")
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         expected_proj = Path(temp_dir) / "expected-proj"
-        
+
         # Generate expected materialized version
         copier.run_copy(
             src_path=str(script_dir),
@@ -107,51 +147,122 @@ def compare_with_expected_materialized(script_dir: Path) -> None:
             data={"project_name": "test-proj", "project_title": "Test Project"},
             unsafe=True,
         )
-        
+
         # Compare expected vs actual
         test_proj_dir = script_dir / "test-proj"
         differences = compare_directories(expected_proj, test_proj_dir)
-        
+
         if not differences:
             click.echo("✓ test-proj matches expected template output")
             return
-        
-        click.echo(f"\n❌ Found {len(differences)} differences between expected and actual:")
+
+        click.echo(
+            f"\n❌ Found {len(differences)} differences between expected and actual:"
+        )
         for diff in differences:
             click.echo(f"  {diff}")
-        
-        # For files that differ in content, show detailed diff
+
+        files_to_copy = []
+        files_needing_manual_fix = []
+
+        # For files that differ in content, show detailed diff and categorize
         click.echo("\nDetailed differences:")
         for diff in differences:
             if diff.startswith("Content differs: "):
-                file_path = diff[len("Content differs: "):]
+                file_path = diff[len("Content differs: ") :]
                 expected_file = expected_proj / file_path
                 actual_file = test_proj_dir / file_path
-                
+
+                # Determine corresponding template file path
+                template_file_path = map_materialized_to_template_path(
+                    script_dir, str(file_path)
+                )
+                template_file = script_dir / template_file_path
+
                 click.echo(f"\n--- Expected (from template): {file_path}")
                 click.echo(f"+++ Actual (in test-proj): {file_path}")
-                
+
                 # Use git diff for better output
                 try:
                     result = subprocess.run(
-                        ["git", "diff", "--no-index", str(expected_file), str(actual_file)],
-                        capture_output=True, text=True, cwd=script_dir
+                        [
+                            "git",
+                            "diff",
+                            "--no-index",
+                            str(expected_file),
+                            str(actual_file),
+                        ],
+                        capture_output=True,
+                        text=True,
+                        cwd=script_dir,
                     )
                     # git diff returns 1 when files differ, which is expected
                     if result.stdout:
                         # Skip the file headers and show just the content diff
-                        lines = result.stdout.split('\n')
+                        lines = result.stdout.split("\n")
                         for line in lines[4:]:  # Skip first 4 lines (headers)
                             if line.strip():
                                 click.echo(f"  {line}")
                 except subprocess.CalledProcessError:
                     # Fallback to basic diff indication
                     click.echo("  (Files differ)")
-        
-        # Provide guidance on next steps
-        click.echo("\nTo fix template files, you can:")
-        click.echo("1. Copy non-templated files: run fix_template with --legacy-mode")
-        click.echo("2. Manually update .jinja files based on the differences shown above")
+
+                # Categorize for fixing
+                if template_file_path.endswith(".jinja"):
+                    files_needing_manual_fix.append((file_path, template_file_path))
+                else:
+                    files_to_copy.append(
+                        (str(file_path), template_file_path, actual_file, template_file)
+                    )
+
+            elif diff.startswith("Extra file: "):
+                file_path = diff[len("Extra file: ") :]
+                actual_file = test_proj_dir / file_path
+
+                # Determine corresponding template file path
+                template_file_path = map_materialized_to_template_path(
+                    script_dir, str(file_path)
+                )
+                template_file = script_dir / template_file_path
+
+                click.echo(f"\nExtra file in test-proj: {file_path}")
+
+                # Categorize for fixing
+                if template_file_path.endswith(".jinja"):
+                    files_needing_manual_fix.append((file_path, template_file_path))
+                else:
+                    files_to_copy.append(
+                        (str(file_path), template_file_path, actual_file, template_file)
+                    )
+
+        # Provide guidance and optionally fix
+        if check_mode:
+            click.echo("\nTo fix template files, you can:")
+            click.echo("1. Copy non-templated files: run fix_template --fix")
+            click.echo(
+                "2. Manually update .jinja files based on the differences shown above"
+            )
+        else:
+            if files_to_copy:
+                click.echo(
+                    f"\nCopying {len(files_to_copy)} non-templated files back to template:"
+                )
+                for (
+                    relative_path,
+                    template_path,
+                    actual_file,
+                    template_file,
+                ) in files_to_copy:
+                    click.echo(f"Copying {relative_path} → {template_path}")
+                    template_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(actual_file, template_file)
+
+            if files_needing_manual_fix:
+                click.echo(
+                    f"\n⚠️  {len(files_needing_manual_fix)} templated files need manual resolution:"
+                )
+                for materialized_path, template_path in files_needing_manual_fix:
+                    click.echo(f"  {materialized_path} → {template_path}")
 
 
 def fix_template_from_materialized(script_dir: Path, revision: str) -> None:
@@ -344,7 +455,10 @@ def check_python(fix: bool) -> None:
 
     # Run Python checks with hatch
     click.echo("Running Python validation checks...")
-    run_git_command(["uv", "run", "hatch", "run", "all-fix" if fix else "all-check"], cwd=test_proj_dir)
+    run_git_command(
+        ["uv", "run", "hatch", "run", "all-fix" if fix else "all-check"],
+        cwd=test_proj_dir,
+    )
     click.echo("✓ Python checks passed")
 
 
@@ -372,10 +486,19 @@ def check_javascript(fix: bool) -> None:
 
 @cli.command()
 @click.argument("revision", required=False)
-@click.option("--legacy-mode", is_flag=True, help="Use legacy git-diff based approach instead of expected materialized comparison.")
-def fix_template(revision: Optional[str], legacy_mode: bool) -> None:
+@click.option(
+    "--legacy-mode",
+    is_flag=True,
+    help="Use legacy git-diff based approach instead of expected materialized comparison.",
+)
+@click.option(
+    "--fix",
+    is_flag=True,
+    help="Automatically copy non-templated files back to template.",
+)
+def fix_template(revision: Optional[str], legacy_mode: bool, fix: bool) -> None:
     """Fix template files by copying back changes from materialized test-proj.
-    
+
     By default, compares test-proj with what the current template would generate.
     REVISION is optional and defaults to merge-base with main when using legacy mode.
     """
@@ -402,9 +525,11 @@ def fix_template(revision: Optional[str], legacy_mode: bool) -> None:
     else:
         # Use new expected materialized comparison approach
         if revision is not None:
-            click.echo("Warning: revision argument ignored when not using --legacy-mode")
-        
-        compare_with_expected_materialized(script_dir)
+            click.echo(
+                "Warning: revision argument ignored when not using --legacy-mode"
+            )
+
+        compare_with_expected_materialized(script_dir, check_mode=fix)
 
 
 if __name__ == "__main__":
