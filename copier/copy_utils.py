@@ -3,6 +3,7 @@
 # dependencies=[
 #     "copier",
 #     "click",
+#     "pyyaml",
 # ]
 # ///
 
@@ -19,8 +20,35 @@ import copier
 
 
 def parse_template_variables() -> Dict[str, str]:
-    """Parse template variables from copier.yaml."""
-    # For this template, we know the main variables
+    """Parse template variables from answers file or use hardcoded fallback."""
+    script_dir = Path(__file__).parent.parent
+
+    # Try to get variables from existing answers file first
+    test_proj = script_dir / "test-proj"
+    answers_file = test_proj / ".copier-answers.yml"
+
+    if answers_file.exists():
+        try:
+            import yaml
+
+            with open(answers_file, "r") as f:
+                answers_data = yaml.safe_load(f)
+                # Filter out copier metadata and return user answers
+                user_answers = {
+                    k: v for k, v in answers_data.items() if not k.startswith("_")
+                }
+
+                # Add computed variables manually since we can't access Worker easily
+                if "project_name" in user_answers:
+                    user_answers["project_name_snake"] = user_answers[
+                        "project_name"
+                    ].replace("-", "_")
+
+                return user_answers
+        except Exception:
+            pass
+
+    # Ultimate fallback for this specific template
     return {
         "project_name": "test-proj",
         "project_title": "Test Project",
@@ -36,7 +64,7 @@ def find_simple_jinja_patterns(template_line: str) -> List[Tuple[str, str]]:
     patterns = []
 
     # Find {{variable}} patterns
-    variable_pattern = r'\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}'
+    variable_pattern = r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}"
     for match in re.finditer(variable_pattern, template_line):
         patterns.append((match.group(0), match.group(1)))
 
@@ -48,7 +76,9 @@ def find_simple_jinja_patterns(template_line: str) -> List[Tuple[str, str]]:
     return patterns
 
 
-def evaluate_jinja_expression(expression: str, variables: Dict[str, str]) -> Optional[str]:
+def evaluate_jinja_expression(
+    expression: str, variables: Dict[str, str]
+) -> Optional[str]:
     """Safely evaluate simple jinja expressions."""
     try:
         # Handle simple variable references
@@ -56,18 +86,18 @@ def evaluate_jinja_expression(expression: str, variables: Dict[str, str]) -> Opt
             return variables[expression]
 
         # Handle simple method calls on variables
-        if '.' in expression:
-            var_name = expression.split('.')[0]
+        if "." in expression:
+            var_name = expression.split(".")[0]
             if var_name in variables:
                 value = variables[var_name]
 
                 # Handle common string methods
                 if ".replace('-', '_')" in expression:
-                    return value.replace('-', '_')
+                    return value.replace("-", "_")
                 elif ".replace('-', ' ').title()" in expression:
-                    return value.replace('-', ' ').title()
+                    return value.replace("-", " ").title()
                 elif ".replace('_', '-')" in expression:
-                    return value.replace('_', '-')
+                    return value.replace("_", "-")
 
         return None
     except Exception:
@@ -75,10 +105,7 @@ def evaluate_jinja_expression(expression: str, variables: Dict[str, str]) -> Opt
 
 
 def attempt_simple_line_resolution(
-    template_line: str,
-    expected_line: str,
-    actual_line: str,
-    variables: Dict[str, str]
+    template_line: str, expected_line: str, actual_line: str, variables: Dict[str, str]
 ) -> Optional[str]:
     """Try to resolve a single line difference by updating jinja template.
 
@@ -91,17 +118,17 @@ def attempt_simple_line_resolution(
         return None
 
     # Skip complex jinja (conditionals, loops, etc.)
-    if '{%' in template_line or '{#' in template_line:
+    if "{%" in template_line or "{#" in template_line:
         return None
 
     # Try to intelligently update the template based on the change
-    
+
     # Case 1: If actual content matches a known variable value, use that variable
     for var_name, var_value in variables.items():
         if actual_line == var_value:
             # Replace entire template with just the variable
             return f"{{{{ {var_name} }}}}"
-    
+
     # Case 2: Look for patterns where variables got removed
     # E.g., "{{ project_name }}-foo" became "test-proj" should become "{{ project_name }}"
     for pattern, expression in jinja_patterns:
@@ -109,20 +136,18 @@ def attempt_simple_line_resolution(
         if expected_value and expected_value == actual_line:
             # The actual line is exactly what this variable produces
             return f"{{{{ {expression} }}}}"
-    
+
     # Case 3: Simple constant replacement (be careful here)
-    if actual_line and not any(char in actual_line for char in ['{{', '{%', '{#']):
+    if actual_line and not any(char in actual_line for char in ["{{", "{%", "{#"]):
         # Only replace with constant if it's clearly different from any variable values
         if actual_line not in variables.values():
             return actual_line
-    
+
     return None
 
 
 def attempt_jinja_auto_resolution(
-    template_file: Path,
-    expected_content: str,
-    actual_content: str
+    template_file: Path, expected_content: str, actual_content: str
 ) -> Optional[str]:
     """Try to automatically resolve jinja template differences.
 
@@ -132,7 +157,7 @@ def attempt_jinja_auto_resolution(
         return None
 
     try:
-        with open(template_file, 'r', encoding='utf-8') as f:
+        with open(template_file, "r", encoding="utf-8") as f:
             template_content = f.read()
     except (UnicodeDecodeError, PermissionError):
         return None
@@ -166,77 +191,85 @@ def attempt_jinja_auto_resolution(
                 changes_made = True
 
     if changes_made:
-        return '\n'.join(new_template_lines)
+        return "\n".join(new_template_lines)
 
     return None
 
 
 def validate_auto_resolved_template(
     script_dir: Path,
-    template_file: Path, 
+    template_file: Path,
     resolved_content: str,
-    expected_materialized_content: str
+    expected_materialized_content: str,
 ) -> bool:
     """Validate that auto-resolved template produces expected output.
-    
+
     Returns True if validation passes, False otherwise.
     """
     # Save current template content
     original_content = None
     if template_file.exists():
         try:
-            with open(template_file, 'r', encoding='utf-8') as f:
+            with open(template_file, "r", encoding="utf-8") as f:
                 original_content = f.read()
         except (UnicodeDecodeError, PermissionError):
             return False
-    
+
     try:
         # Write resolved content temporarily
         template_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(template_file, 'w', encoding='utf-8') as f:
+        with open(template_file, "w", encoding="utf-8") as f:
             f.write(resolved_content)
-        
+
         # Test regeneration in a temp directory
         with tempfile.TemporaryDirectory() as temp_dir:
             test_proj = Path(temp_dir) / "validation-proj"
-            
+
             copier.run_copy(
                 src_path=str(script_dir),
                 dst_path=str(test_proj),
-                data={"project_name": "test-proj", "project_title": "Test Project"},
+                data=parse_template_variables(),
                 unsafe=True,
             )
-            
+
             # Get the materialized file path
             relative_template_path = template_file.relative_to(script_dir)
-            if relative_template_path.name.endswith('.jinja'):
+            if relative_template_path.name.endswith(".jinja"):
                 # Remove .jinja extension and handle template path mapping
-                materialized_path_str = str(relative_template_path)[:-6]  # Remove .jinja
+                materialized_path_str = str(relative_template_path)[
+                    :-6
+                ]  # Remove .jinja
                 # Handle {{ project_name_snake }} mapping
-                if "{{ project_name_snake }}" in materialized_path_str:
-                    materialized_path_str = materialized_path_str.replace("{{ project_name_snake }}", "test_proj")
+                variables = parse_template_variables()
+                if (
+                    "{{ project_name_snake }}" in materialized_path_str
+                    and "project_name_snake" in variables
+                ):
+                    materialized_path_str = materialized_path_str.replace(
+                        "{{ project_name_snake }}", variables["project_name_snake"]
+                    )
                 materialized_file = test_proj / materialized_path_str
             else:
                 materialized_file = test_proj / relative_template_path
-            
+
             if not materialized_file.exists():
                 return False
-            
+
             # Compare content
             try:
-                with open(materialized_file, 'r', encoding='utf-8') as f:
+                with open(materialized_file, "r", encoding="utf-8") as f:
                     actual_content = f.read()
                 return actual_content.strip() == expected_materialized_content.strip()
             except (UnicodeDecodeError, PermissionError):
                 return False
-                
+
     except Exception:
         return False
     finally:
         # Restore original content if it existed
         if original_content is not None:
             try:
-                with open(template_file, 'w', encoding='utf-8') as f:
+                with open(template_file, "w", encoding="utf-8") as f:
                     f.write(original_content)
             except (UnicodeDecodeError, PermissionError):
                 pass
@@ -257,9 +290,6 @@ def run_git_command(
         click.echo(f"stdout: {e.stdout}", err=True)
         click.echo(f"stderr: {e.stderr}", err=True)
         sys.exit(1)
-
-
-
 
 
 def get_git_tracked_files(directory: Path, respect_gitignore: bool = True) -> set[Path]:
@@ -286,11 +316,11 @@ def get_git_tracked_files(directory: Path, respect_gitignore: bool = True) -> se
             cwd=directory,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
 
         tracked_files = set()
-        for line in result.stdout.strip().split('\n'):
+        for line in result.stdout.strip().split("\n"):
             if line.strip():
                 file_path = directory / line.strip()
                 relative_path = Path(line.strip())
@@ -304,7 +334,9 @@ def get_git_tracked_files(directory: Path, respect_gitignore: bool = True) -> se
         if "expected" in str(directory):
             return get_git_tracked_files(directory, respect_gitignore=False)
         else:
-            click.echo("Warning: Could not determine git-tracked files, using all files")
+            click.echo(
+                "Warning: Could not determine git-tracked files, using all files"
+            )
             return get_git_tracked_files(directory, respect_gitignore=False)
 
 
@@ -315,8 +347,16 @@ def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
     # Get files in both directories
     # For expected (temp) directory: get all files (no gitignore)
     # For actual directory: respect gitignore
-    expected_files = get_git_tracked_files(expected_dir, respect_gitignore=False) if expected_dir.exists() else set()
-    actual_files = get_git_tracked_files(actual_dir, respect_gitignore=True) if actual_dir.exists() else set()
+    expected_files = (
+        get_git_tracked_files(expected_dir, respect_gitignore=False)
+        if expected_dir.exists()
+        else set()
+    )
+    actual_files = (
+        get_git_tracked_files(actual_dir, respect_gitignore=True)
+        if actual_dir.exists()
+        else set()
+    )
 
     # Check for files only in expected
     for file_path in expected_files - actual_files:
@@ -361,7 +401,7 @@ def compare_with_expected_materialized(
         copier.run_copy(
             src_path=str(script_dir),
             dst_path=str(expected_proj),
-            data={"project_name": "test-proj", "project_title": "Test Project"},
+            data=parse_template_variables(),
             unsafe=True,
         )
 
@@ -442,7 +482,7 @@ def compare_with_expected_materialized(
                         auto_resolved_content = attempt_jinja_auto_resolution(
                             template_file, expected_content, actual_content
                         )
-                    
+
                     if auto_resolved_content:
                         # Accept the auto-resolution (our logic is conservative enough)
                         if check_mode:
@@ -450,13 +490,25 @@ def compare_with_expected_materialized(
                         else:
                             click.echo(f"  ✓ Auto-resolved: {template_file_path}")
                         files_to_copy.append(
-                            (str(file_path), template_file_path, None, template_file, auto_resolved_content)
+                            (
+                                str(file_path),
+                                template_file_path,
+                                None,
+                                template_file,
+                                auto_resolved_content,
+                            )
                         )
                     else:
                         files_needing_manual_fix.append((file_path, template_file_path))
                 else:
                     files_to_copy.append(
-                        (str(file_path), template_file_path, actual_file, template_file, None)
+                        (
+                            str(file_path),
+                            template_file_path,
+                            actual_file,
+                            template_file,
+                            None,
+                        )
                     )
 
             elif diff.startswith("Extra file: "):
@@ -477,7 +529,13 @@ def compare_with_expected_materialized(
                     files_needing_manual_fix.append((file_path, template_file_path))
                 else:
                     files_to_copy.append(
-                        (str(file_path), template_file_path, actual_file, template_file, None)
+                        (
+                            str(file_path),
+                            template_file_path,
+                            actual_file,
+                            template_file,
+                            None,
+                        )
                     )
 
         # Provide guidance and optionally fix
@@ -488,14 +546,14 @@ def compare_with_expected_materialized(
                 if files_to_copy:
                     click.echo(f"  Copy {len(files_to_copy)} files back to template")
                 if files_needing_manual_fix:
-                    click.echo(f"  {len(files_needing_manual_fix)} files need manual resolution")
+                    click.echo(
+                        f"  {len(files_needing_manual_fix)} files need manual resolution"
+                    )
                 click.echo("\nTo apply changes, run: fix-template")
         else:
             # Actually fix the files
             if files_to_copy:
-                click.echo(
-                    f"\nCopying {len(files_to_copy)} files back to template:"
-                )
+                click.echo(f"\nCopying {len(files_to_copy)} files back to template:")
                 for (
                     relative_path,
                     template_path,
@@ -505,10 +563,10 @@ def compare_with_expected_materialized(
                 ) in files_to_copy:
                     click.echo(f"Copying {relative_path} → {template_path}")
                     template_file.parent.mkdir(parents=True, exist_ok=True)
-                    
+
                     if auto_resolved_content:
                         # Write auto-resolved jinja content
-                        with open(template_file, 'w', encoding='utf-8') as f:
+                        with open(template_file, "w", encoding="utf-8") as f:
                             f.write(auto_resolved_content)
                     else:
                         # Copy regular file
@@ -522,15 +580,18 @@ def compare_with_expected_materialized(
                     click.echo(f"  {materialized_path} → {template_path}")
 
 
-
-
-
 def map_materialized_to_template_path(script_dir: Path, materialized_path: str) -> str:
     """Map a materialized file path back to its template path."""
     path_parts: tuple[str, ...] = Path(materialized_path).parts
 
-    # Handle the special case of src/test_proj/ → src/{{ project_name_snake }}/
-    if len(path_parts) >= 2 and path_parts[0] == "src" and path_parts[1] == "test_proj":
+    # Handle the special case of src/{computed_name}/ → src/{{ project_name_snake }}/
+    variables = parse_template_variables()
+    project_name_snake = variables.get("project_name_snake", "test_proj")
+    if (
+        len(path_parts) >= 2
+        and path_parts[0] == "src"
+        and path_parts[1] == project_name_snake
+    ):
         # Replace test_proj with the template variable
         new_parts: tuple[str, ...] = ("src", "{{ project_name_snake }}") + path_parts[
             2:
@@ -572,7 +633,7 @@ def regenerate_test_proj(script_dir: Path) -> None:
     copier.run_copy(
         src_path=str(script_dir),
         dst_path=str(test_proj_dir),
-        data={"project_name": "test-proj", "project_title": "Test Project"},
+        data=parse_template_variables(),
         unsafe=True,
     )
 
