@@ -37,12 +37,6 @@ def parse_template_variables() -> Dict[str, str]:
                 k: v for k, v in answers_data.items() if not k.startswith("_")
             }
 
-            # Add computed variables manually since we can't access Worker easily
-            if "project_name" in user_answers:
-                user_answers["project_name_snake"] = user_answers[
-                    "project_name"
-                ].replace("-", "_")
-
             return user_answers
 
 
