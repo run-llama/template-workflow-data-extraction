@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 import click
 import copier
+import yaml
 
 
 def parse_template_variables() -> Dict[str, str]:
@@ -28,32 +29,21 @@ def parse_template_variables() -> Dict[str, str]:
     answers_file = test_proj / ".copier-answers.yml"
 
     if answers_file.exists():
-        try:
-            import yaml
 
-            with open(answers_file, "r") as f:
-                answers_data = yaml.safe_load(f)
-                # Filter out copier metadata and return user answers
-                user_answers = {
-                    k: v for k, v in answers_data.items() if not k.startswith("_")
-                }
+        with open(answers_file, "r") as f:
+            answers_data = yaml.safe_load(f)
+            # Filter out copier metadata and return user answers
+            user_answers = {
+                k: v for k, v in answers_data.items() if not k.startswith("_")
+            }
 
-                # Add computed variables manually since we can't access Worker easily
-                if "project_name" in user_answers:
-                    user_answers["project_name_snake"] = user_answers[
-                        "project_name"
-                    ].replace("-", "_")
+            # Add computed variables manually since we can't access Worker easily
+            if "project_name" in user_answers:
+                user_answers["project_name_snake"] = user_answers[
+                    "project_name"
+                ].replace("-", "_")
 
-                return user_answers
-        except Exception:
-            pass
-
-    # Ultimate fallback for this specific template
-    return {
-        "project_name": "test-proj",
-        "project_title": "Test Project",
-        "project_name_snake": "test_proj",
-    }
+            return user_answers
 
 
 def find_simple_jinja_patterns(template_line: str) -> List[Tuple[str, str]]:
@@ -129,20 +119,6 @@ def attempt_simple_line_resolution(
             # Replace entire template with just the variable
             return f"{{{{ {var_name} }}}}"
 
-    # Case 2: Look for patterns where variables got removed
-    # E.g., "{{ project_name }}-foo" became "test-proj" should become "{{ project_name }}"
-    for pattern, expression in jinja_patterns:
-        expected_value = evaluate_jinja_expression(expression, variables)
-        if expected_value and expected_value == actual_line:
-            # The actual line is exactly what this variable produces
-            return f"{{{{ {expression} }}}}"
-
-    # Case 3: Simple constant replacement (be careful here)
-    if actual_line and not any(char in actual_line for char in ["{{", "{%", "{#"]):
-        # Only replace with constant if it's clearly different from any variable values
-        if actual_line not in variables.values():
-            return actual_line
-
     return None
 
 
@@ -156,11 +132,8 @@ def attempt_jinja_auto_resolution(
     if not template_file.exists():
         return None
 
-    try:
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-    except (UnicodeDecodeError, PermissionError):
-        return None
+    with open(template_file, "r", encoding="utf-8") as f:
+        template_content = f.read()
 
     template_lines = template_content.splitlines()
     expected_lines = expected_content.splitlines()
@@ -209,11 +182,8 @@ def validate_auto_resolved_template(
     # Save current template content
     original_content = None
     if template_file.exists():
-        try:
-            with open(template_file, "r", encoding="utf-8") as f:
-                original_content = f.read()
-        except (UnicodeDecodeError, PermissionError):
-            return False
+        with open(template_file, "r", encoding="utf-8") as f:
+            original_content = f.read()
 
     try:
         # Write resolved content temporarily
@@ -236,18 +206,7 @@ def validate_auto_resolved_template(
             relative_template_path = template_file.relative_to(script_dir)
             if relative_template_path.name.endswith(".jinja"):
                 # Remove .jinja extension and handle template path mapping
-                materialized_path_str = str(relative_template_path)[
-                    :-6
-                ]  # Remove .jinja
-                # Handle {{ project_name_snake }} mapping
-                variables = parse_template_variables()
-                if (
-                    "{{ project_name_snake }}" in materialized_path_str
-                    and "project_name_snake" in variables
-                ):
-                    materialized_path_str = materialized_path_str.replace(
-                        "{{ project_name_snake }}", variables["project_name_snake"]
-                    )
+                materialized_path_str = str(relative_template_path).removesuffix(".jinja")
                 materialized_file = test_proj / materialized_path_str
             else:
                 materialized_file = test_proj / relative_template_path
@@ -256,23 +215,15 @@ def validate_auto_resolved_template(
                 return False
 
             # Compare content
-            try:
-                with open(materialized_file, "r", encoding="utf-8") as f:
-                    actual_content = f.read()
-                return actual_content.strip() == expected_materialized_content.strip()
-            except (UnicodeDecodeError, PermissionError):
-                return False
+            with open(materialized_file, "r", encoding="utf-8") as f:
+                actual_content = f.read()
+            return actual_content.strip() == expected_materialized_content.strip()
 
-    except Exception:
-        return False
     finally:
         # Restore original content if it existed
-        if original_content is not None:
-            try:
-                with open(template_file, "w", encoding="utf-8") as f:
-                    f.write(original_content)
-            except (UnicodeDecodeError, PermissionError):
-                pass
+        if original_content:
+            with open(template_file, "w", encoding="utf-8") as f:
+                f.write(original_content)
 
 
 def run_git_command(
@@ -308,36 +259,25 @@ def get_git_tracked_files(directory: Path, respect_gitignore: bool = True) -> se
                     tracked_files.add(relative_path)
         return tracked_files
 
-    try:
-        # Use git ls-files to get files that git would track
-        # This respects .gitignore rules
-        result = subprocess.run(
-            ["git", "ls-files", "--others", "--cached", "--exclude-standard"],
-            cwd=directory,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+    # Use git ls-files to get files that git would track
+    # This respects .gitignore rules
+    result = subprocess.run(
+        ["git", "ls-files", "--others", "--cached", "--exclude-standard"],
+        cwd=directory,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
 
-        tracked_files = set()
-        for line in result.stdout.strip().split("\n"):
-            if line.strip():
-                file_path = directory / line.strip()
-                relative_path = Path(line.strip())
-                if file_path.is_file() and relative_path.name not in ignored_files:
-                    tracked_files.add(relative_path)
+    tracked_files = set()
+    for line in result.stdout.strip().split("\n"):
+        if line.strip():
+            file_path = directory / line.strip()
+            relative_path = Path(line.strip())
+            if file_path.is_file() and relative_path.name not in ignored_files:
+                tracked_files.add(relative_path)
 
-        return tracked_files
-    except subprocess.CalledProcessError:
-        # Fallback: for temp directories (expected), don't respect gitignore
-        # For actual directories, warn and use all files
-        if "expected" in str(directory):
-            return get_git_tracked_files(directory, respect_gitignore=False)
-        else:
-            click.echo(
-                "Warning: Could not determine git-tracked files, using all files"
-            )
-            return get_git_tracked_files(directory, respect_gitignore=False)
+    return tracked_files
 
 
 def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
@@ -371,19 +311,13 @@ def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
         expected_file = expected_dir / file_path
         actual_file = actual_dir / file_path
 
-        # Compare file contents
-        try:
-            with open(expected_file, "r", encoding="utf-8") as f:
-                expected_content = f.read()
-            with open(actual_file, "r", encoding="utf-8") as f:
-                actual_content = f.read()
+        with open(expected_file, "r", encoding="utf-8") as f:
+            expected_content = f.read()
+        with open(actual_file, "r", encoding="utf-8") as f:
+            actual_content = f.read()
 
-            if expected_content != actual_content:
-                differences.append(f"Content differs: {file_path}")
-        except (UnicodeDecodeError, PermissionError):
-            # For binary files or permission issues, use basic comparison
-            if expected_file.stat().st_size != actual_file.stat().st_size:
-                differences.append(f"Content differs (binary): {file_path}")
+        if expected_content != actual_content:
+            differences.append(f"Content differs: {file_path}")
 
     return differences
 
@@ -582,27 +516,6 @@ def compare_with_expected_materialized(
 
 def map_materialized_to_template_path(script_dir: Path, materialized_path: str) -> str:
     """Map a materialized file path back to its template path."""
-    path_parts: tuple[str, ...] = Path(materialized_path).parts
-
-    # Handle the special case of src/{computed_name}/ → src/{{ project_name_snake }}/
-    variables = parse_template_variables()
-    project_name_snake = variables.get("project_name_snake", "test_proj")
-    if (
-        len(path_parts) >= 2
-        and path_parts[0] == "src"
-        and path_parts[1] == project_name_snake
-    ):
-        # Replace test_proj with the template variable
-        new_parts: tuple[str, ...] = ("src", "{{ project_name_snake }}") + path_parts[
-            2:
-        ]
-        template_path: str = str(Path(*new_parts))
-
-        # Check if a .jinja version exists
-        jinja_path: str = template_path + ".jinja"
-        if (script_dir / jinja_path).exists():
-            return jinja_path
-        return template_path
 
     # For other paths, check if .jinja version exists
     jinja_path: str = materialized_path + ".jinja"
