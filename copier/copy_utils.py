@@ -4,8 +4,14 @@
 #     "copier",
 #     "click",
 #     "pyyaml",
+#     "rich",
 # ]
 # ///
+
+import warnings
+
+# Suppress deprecation warnings from copier
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import os
 import re
@@ -13,43 +19,71 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple
+from typing import Dict, List, Optional, Tuple
+
 import click
-import copier
-from copier.template import Template
 import yaml
+from rich.console import Console
+from rich.spinner import Spinner
+
+import copier
+from copier._template import Template
+from copier.errors import DirtyLocalWarning
+
+warnings.filterwarnings("ignore", category=DirtyLocalWarning)
+
+console = Console()
+
+
+def run_copier_quietly(src_path: str, dst_path: str, data: Dict[str, str]) -> None:
+    """Run copier with minimal output."""
+    copier.run_copy(
+        src_path=src_path,
+        dst_path=dst_path,
+        data=data,
+        unsafe=True,
+        quiet=True,
+    )
+
+
+def render_jinja_string(
+    template_string: str, variables: Dict[str, str], script_dir: Path
+) -> str:
+    """Render a Jinja template string using Copier's configuration."""
+    template = Template(url=str(script_dir))
+
+    import jinja2
+
+    jinja_env = jinja2.Environment(
+        loader=jinja2.BaseLoader(),
+        extensions=template.jinja_extensions,
+        **template.envops,
+    )
+
+    return jinja_env.from_string(template_string).render(**variables)
 
 
 def parse_template_variables() -> Dict[str, str]:
     """Parse template variables using Copier's Jinja environment."""
     script_dir = Path(__file__).parent.parent
-    
+
     # Read answers from existing materialized project
     test_proj = script_dir / "test-proj"
     answers_file = test_proj / ".copier-answers.yml"
-    
+
     with open(answers_file, "r") as f:
         answers_data = yaml.safe_load(f)
         # Filter out copier metadata
-        user_answers = {
-            k: v for k, v in answers_data.items() if not k.startswith("_")
-        }
-    
-    # Get template and create Jinja environment with template's configuration
+        user_answers = {k: v for k, v in answers_data.items() if not k.startswith("_")}
+
+    # Get template configuration for variable parsing
     template = Template(url=str(script_dir))
-    
-    # Create Jinja environment with the same configuration as Copier would use
-    import jinja2
-    jinja_env = jinja2.Environment(
-        loader=jinja2.BaseLoader(),
-        extensions=template.jinja_extensions,
-        **template.envops
-    )
-    
+
     # Build complete variable context by evaluating template defaults
     result = dict(user_answers)
-    
+
     # Multiple passes to handle dependencies between computed variables
     max_iterations = 10
     for iteration in range(max_iterations):
@@ -58,24 +92,23 @@ def parse_template_variables() -> Dict[str, str]:
             if question_name not in result and "default" in question_config:
                 default_value = question_config["default"]
                 if isinstance(default_value, str) and "{{" in default_value:
-                    # Evaluate Jinja expression using our environment
+                    # Evaluate Jinja expression using our helper
                     try:
-                        rendered = jinja_env.from_string(default_value).render(**result)
+                        rendered = render_jinja_string(
+                            default_value, result, script_dir
+                        )
                         result[question_name] = rendered
                         changed = True
                     except Exception as e:
-                        print(f"Error evaluating {default_value} for {question_name}")
-                        print(e)
                         # Skip variables that can't be evaluated yet
                         pass
                 else:
                     result[question_name] = default_value
                     changed = True
-        
+
         # Stop if no new variables were computed
         if not changed:
             break
-    print(f"result: {result}")
     return result
 
 
@@ -134,7 +167,6 @@ def attempt_simple_line_resolution(
 
     Returns updated template line if successful, None if too complex.
     """
-
     # Skip if template line has no jinja patterns
     jinja_patterns = find_simple_jinja_patterns(template_line)
     if not jinja_patterns:
@@ -144,19 +176,28 @@ def attempt_simple_line_resolution(
     if "{%" in template_line or "{#" in template_line:
         return None
 
-    # Try to intelligently update the template based on the change
+    # Simple approach: for lines with variables, update the literal parts
+    # Validation will ensure this actually works
+    if len(jinja_patterns) == 1:
+        pattern, var_name = jinja_patterns[0]
+        var_value = variables.get(var_name, "")
 
-    # Case 1: If actual content matches a known variable value, use that variable
-    for var_name, var_value in variables.items():
-        if actual_line == var_value:
-            # Replace entire template with just the variable
-            return f"{{{{ {var_name} }}}}"
+        # If both lines contain the variable value, update surrounding text
+        if var_value and var_value in expected_line and var_value in actual_line:
+            expected_parts = expected_line.split(var_value)
+            actual_parts = actual_line.split(var_value)
+
+            if len(expected_parts) == 2 and len(actual_parts) == 2:
+                # Replace literal text around the variable
+                actual_prefix, actual_suffix = actual_parts
+                result = f"{actual_prefix}{pattern}{actual_suffix}"
+                return result
 
     return None
 
 
 def attempt_jinja_auto_resolution(
-    template_file: Path, expected_content: str, actual_content: str
+    template_file: Path, expected_content: str, actual_content: str, variables: Dict[str, str]
 ) -> Optional[str]:
     """Try to automatically resolve jinja template differences.
 
@@ -171,9 +212,6 @@ def attempt_jinja_auto_resolution(
     template_lines = template_content.splitlines()
     expected_lines = expected_content.splitlines()
     actual_lines = actual_content.splitlines()
-
-    # Get template variables
-    variables = parse_template_variables()
 
     # Track changes made
     changes_made = False
@@ -197,7 +235,14 @@ def attempt_jinja_auto_resolution(
                 changes_made = True
 
     if changes_made:
-        return "\n".join(new_template_lines)
+        proposed_content = "\n".join(new_template_lines)
+
+        # Validate the proposed fix before accepting it
+        script_dir = Path(__file__).parent.parent
+        if validate_auto_resolved_template(
+            script_dir, template_file, proposed_content, actual_content
+        ):
+            return proposed_content
 
     return None
 
@@ -228,30 +273,45 @@ def validate_auto_resolved_template(
         with tempfile.TemporaryDirectory() as temp_dir:
             test_proj = Path(temp_dir) / "validation-proj"
 
-            copier.run_copy(
-                src_path=str(script_dir),
-                dst_path=str(test_proj),
-                data=parse_template_variables(),
-                unsafe=True,
+            run_copier_quietly(
+                str(script_dir),
+                str(test_proj),
+                parse_template_variables(),
             )
 
-            # Get the materialized file path
+            # Get the materialized file path using existing template mapping logic
             relative_template_path = template_file.relative_to(script_dir)
+
+            # Use the reverse of map_materialized_to_template_path to get materialized path
             if relative_template_path.name.endswith(".jinja"):
-                # Remove .jinja extension and handle template path mapping
-                materialized_path_str = str(relative_template_path).removesuffix(".jinja")
-                materialized_file = test_proj / materialized_path_str
+                materialized_path_str = str(relative_template_path).removesuffix(
+                    ".jinja"
+                )
             else:
-                materialized_file = test_proj / relative_template_path
+                materialized_path_str = str(relative_template_path)
+
+            # Apply template variable substitution to the path
+            variables = parse_template_variables()
+            materialized_path_str = render_jinja_string(
+                materialized_path_str, variables, script_dir
+            )
+
+            materialized_file = test_proj / materialized_path_str
 
             if not materialized_file.exists():
                 return False
 
             # Compare content
             with open(materialized_file, "r", encoding="utf-8") as f:
-                actual_content = f.read()
-            return actual_content.strip() == expected_materialized_content.strip()
+                validation_actual = f.read()
 
+            expected_stripped = expected_materialized_content.strip()
+            actual_stripped = validation_actual.strip()
+
+            return actual_stripped == expected_stripped
+
+    except Exception:
+        return False
     finally:
         # Restore original content if it existed
         if original_content:
@@ -263,16 +323,16 @@ def run_git_command(
     cmd: List[str], cwd: Optional[Path] = None
 ) -> subprocess.CompletedProcess[str]:
     """Run a git command and return the result."""
-    click.echo(f"Running: {' '.join(cmd)}")
+    console.print(f"Running: {' '.join(cmd)}")
     try:
         result = subprocess.run(
             cmd, cwd=cwd, capture_output=True, text=True, check=True
         )
         return result
     except subprocess.CalledProcessError as e:
-        click.echo(f"Command failed with exit code {e.returncode}", err=True)
-        click.echo(f"stdout: {e.stdout}", err=True)
-        click.echo(f"stderr: {e.stderr}", err=True)
+        console.print(f"Command failed with exit code {e.returncode}", style="bold red")
+        console.print(f"stdout: {e.stdout}", style="bold yellow")
+        console.print(f"stderr: {e.stderr}", style="bold yellow")
         sys.exit(1)
 
 
@@ -359,192 +419,205 @@ def compare_with_expected_materialized(
     script_dir: Path, fix_mode: bool = False
 ) -> None:
     """Compare current test-proj with freshly generated template."""
-    click.echo("Generating expected materialized version from current template...")
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        expected_proj = Path(temp_dir) / "expected-proj"
+    with console.status(
+        "[bold green]Generating expected materialized version from current template..."
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            expected_proj = Path(temp_dir) / "expected-proj"
 
-        # Generate expected materialized version
-        copier.run_copy(
-            src_path=str(script_dir),
-            dst_path=str(expected_proj),
-            data=parse_template_variables(),
-            unsafe=True,
-        )
+            # Generate expected materialized version
+            run_copier_quietly(
+                str(script_dir),
+                str(expected_proj),
+                parse_template_variables(),
+            )
 
-        # Compare expected vs actual
-        test_proj_dir = script_dir / "test-proj"
-        differences = compare_directories(expected_proj, test_proj_dir)
+            # Compare expected vs actual
+            test_proj_dir = script_dir / "test-proj"
+            differences = compare_directories(expected_proj, test_proj_dir)
 
-        if not differences:
-            click.echo("✓ test-proj matches expected template output")
-            return
-
-        click.echo(
-            f"\n❌ Found {len(differences)} differences between expected and actual:"
-        )
-        for diff in differences:
-            click.echo(f"  {diff}")
-
-        files_to_copy = []
-        files_needing_manual_fix = []
-
-        # For files that differ in content, show detailed diff and categorize
-        click.echo("\nDetailed differences:")
-        for diff in differences:
-            if diff.startswith("Content differs: "):
-                file_path = diff[len("Content differs: ") :]
-                expected_file = expected_proj / file_path
-                actual_file = test_proj_dir / file_path
-
-                # Determine corresponding template file path
-                template_file_path = map_materialized_to_template_path(
-                    script_dir, str(file_path)
+            if not differences:
+                console.print(
+                    "✅ test-proj matches expected template output", style="bold green"
                 )
-                template_file = script_dir / template_file_path
+                return
 
-                # Read file contents for auto-resolution
-                try:
-                    with open(expected_file, "r", encoding="utf-8") as f:
-                        expected_content = f.read()
-                    with open(actual_file, "r", encoding="utf-8") as f:
-                        actual_content = f.read()
-                except (UnicodeDecodeError, PermissionError):
-                    expected_content = None
-                    actual_content = None
+            console.print(
+                f"\n❌ Found {len(differences)} differences between expected and actual:",
+                style="bold red",
+            )
+            for diff in differences:
+                console.print(f"  {diff}")
 
-                click.echo(f"\n--- Expected (from template): {file_path}")
-                click.echo(f"+++ Actual (in test-proj): {file_path}")
+            files_to_copy = []
+            files_needing_manual_fix = []
+            
+            # Parse template variables once for auto-resolution
+            variables = parse_template_variables()
 
-                # Use git diff for better output
-                try:
-                    result = subprocess.run(
-                        [
-                            "git",
-                            "diff",
-                            "--no-index",
-                            str(expected_file),
-                            str(actual_file),
-                        ],
-                        capture_output=True,
-                        text=True,
-                        cwd=script_dir,
+            # For files that differ in content, show detailed diff and categorize
+            console.print("\nDetailed differences:")
+            for diff in differences:
+                if diff.startswith("Content differs: "):
+                    file_path = diff[len("Content differs: ") :]
+                    expected_file = expected_proj / file_path
+                    actual_file = test_proj_dir / file_path
+
+                    # Determine corresponding template file path
+                    template_file_path = map_materialized_to_template_path(
+                        script_dir, str(file_path)
                     )
-                    # git diff returns 1 when files differ, which is expected
-                    if result.stdout:
-                        # Skip the file headers and show just the content diff
-                        lines = result.stdout.split("\n")
-                        for line in lines[4:]:  # Skip first 4 lines (headers)
-                            if line.strip():
-                                click.echo(f"  {line}")
-                except subprocess.CalledProcessError:
-                    # Fallback to basic diff indication
-                    click.echo("  (Files differ)")
+                    template_file = script_dir / template_file_path
 
-                # Categorize for fixing
-                if template_file_path.endswith(".jinja"):
-                    # Try auto-resolution first
-                    auto_resolved_content = None
-                    if expected_content and actual_content:
-                        auto_resolved_content = attempt_jinja_auto_resolution(
-                            template_file, expected_content, actual_content
+                    # Read file contents for auto-resolution
+                    try:
+                        with open(expected_file, "r", encoding="utf-8") as f:
+                            expected_content = f.read()
+                        with open(actual_file, "r", encoding="utf-8") as f:
+                            actual_content = f.read()
+                    except (UnicodeDecodeError, PermissionError):
+                        expected_content = None
+                        actual_content = None
+
+                    console.print(f"\n--- Expected (from template): {file_path}")
+                    console.print(f"+++ Actual (in test-proj): {file_path}")
+
+                    # Use git diff for better output
+                    try:
+                        result = subprocess.run(
+                            [
+                                "git",
+                                "diff",
+                                "--no-index",
+                                str(expected_file),
+                                str(actual_file),
+                            ],
+                            capture_output=True,
+                            text=True,
+                            cwd=script_dir,
                         )
+                        # git diff returns 1 when files differ, which is expected
+                        if result.stdout:
+                            # Skip the file headers and show just the content diff
+                            lines = result.stdout.split("\n")
+                            for line in lines[4:]:  # Skip first 4 lines (headers)
+                                if line.strip():
+                                    console.print(f"  {line}")
+                    except subprocess.CalledProcessError:
+                        # Fallback to basic diff indication
+                        console.print("  (Files differ)")
 
-                    if auto_resolved_content:
-                        # Accept the auto-resolution (our logic is conservative enough)
-                        if fix_mode:
-                            click.echo(f"  ✓ Auto-resolved: {template_file_path}")
+                    # Categorize for fixing
+                    if template_file_path.endswith(".jinja"):
+                        # Try auto-resolution first
+                        auto_resolved_content = None
+                        if expected_content and actual_content:
+                            auto_resolved_content = attempt_jinja_auto_resolution(
+                                template_file, expected_content, actual_content, variables
+                            )
+
+                        if auto_resolved_content:
+                            # Accept the auto-resolution (our logic is conservative enough)
+                            if fix_mode:
+                                console.print(
+                                    f"  ✓ Auto-resolved: {template_file_path}"
+                                )
+                            else:
+                                console.print(
+                                    f"  ✓ Would auto-resolve: {template_file_path}"
+                                )
+                            files_to_copy.append(
+                                (
+                                    str(file_path),
+                                    template_file_path,
+                                    None,
+                                    template_file,
+                                    auto_resolved_content,
+                                )
+                            )
                         else:
-                            click.echo(f"  ✓ Would auto-resolve: {template_file_path}")
+                            files_needing_manual_fix.append(
+                                (file_path, template_file_path)
+                            )
+                    else:
                         files_to_copy.append(
                             (
                                 str(file_path),
                                 template_file_path,
-                                None,
+                                actual_file,
                                 template_file,
-                                auto_resolved_content,
+                                None,
                             )
                         )
-                    else:
+
+                elif diff.startswith("Extra file: "):
+                    file_path = diff[len("Extra file: ") :]
+                    actual_file = test_proj_dir / file_path
+
+                    # Determine corresponding template file path
+                    template_file_path = map_materialized_to_template_path(
+                        script_dir, str(file_path)
+                    )
+                    template_file = script_dir / template_file_path
+
+                    console.print(f"\nExtra file in test-proj: {file_path}")
+
+                    # Categorize for fixing
+                    if template_file_path.endswith(".jinja"):
+                        # For extra files, we can't auto-resolve without expected content
                         files_needing_manual_fix.append((file_path, template_file_path))
-                else:
-                    files_to_copy.append(
-                        (
-                            str(file_path),
-                            template_file_path,
-                            actual_file,
-                            template_file,
-                            None,
-                        )
-                    )
-
-            elif diff.startswith("Extra file: "):
-                file_path = diff[len("Extra file: ") :]
-                actual_file = test_proj_dir / file_path
-
-                # Determine corresponding template file path
-                template_file_path = map_materialized_to_template_path(
-                    script_dir, str(file_path)
-                )
-                template_file = script_dir / template_file_path
-
-                click.echo(f"\nExtra file in test-proj: {file_path}")
-
-                # Categorize for fixing
-                if template_file_path.endswith(".jinja"):
-                    # For extra files, we can't auto-resolve without expected content
-                    files_needing_manual_fix.append((file_path, template_file_path))
-                else:
-                    files_to_copy.append(
-                        (
-                            str(file_path),
-                            template_file_path,
-                            actual_file,
-                            template_file,
-                            None,
-                        )
-                    )
-
-        # Provide guidance and optionally fix
-        if fix_mode:
-            # Actually fix the files
-            if files_to_copy:
-                click.echo(f"\nCopying {len(files_to_copy)} files back to template:")
-                for (
-                    relative_path,
-                    template_path,
-                    actual_file,
-                    template_file,
-                    auto_resolved_content,
-                ) in files_to_copy:
-                    click.echo(f"Copying {relative_path} → {template_path}")
-                    template_file.parent.mkdir(parents=True, exist_ok=True)
-
-                    if auto_resolved_content:
-                        # Write auto-resolved jinja content
-                        with open(template_file, "w", encoding="utf-8") as f:
-                            f.write(auto_resolved_content)
                     else:
-                        # Copy regular file
-                        shutil.copy2(actual_file, template_file)
+                        files_to_copy.append(
+                            (
+                                str(file_path),
+                                template_file_path,
+                                actual_file,
+                                template_file,
+                                None,
+                            )
+                        )
 
+    # Provide guidance and optionally fix (outside temp directory)
+    if fix_mode:
+        # Actually fix the files
+        if files_to_copy:
+            console.print(f"\nCopying {len(files_to_copy)} files back to template:")
+            for (
+                relative_path,
+                template_path,
+                actual_file,
+                template_file,
+                auto_resolved_content,
+            ) in files_to_copy:
+                console.print(f"Copying {relative_path} → {template_path}")
+                template_file.parent.mkdir(parents=True, exist_ok=True)
+
+                if auto_resolved_content:
+                    # Write auto-resolved jinja content
+                    with open(template_file, "w", encoding="utf-8") as f:
+                        f.write(auto_resolved_content)
+                else:
+                    # Copy regular file
+                    shutil.copy2(actual_file, template_file)
+
+        if files_needing_manual_fix:
+            console.print(
+                f"\n⚠️  {len(files_needing_manual_fix)} templated files need manual resolution:"
+            )
+            for materialized_path, template_path in files_needing_manual_fix:
+                console.print(f"  {materialized_path} → {template_path}")
+    else:
+        # In check mode, just show what would happen
+        if files_to_copy or files_needing_manual_fix:
+            console.print("\nWould make the following changes:")
+            if files_to_copy:
+                console.print(f"  Copy {len(files_to_copy)} files back to template")
             if files_needing_manual_fix:
-                click.echo(
-                    f"\n⚠️  {len(files_needing_manual_fix)} templated files need manual resolution:"
+                console.print(
+                    f"  {len(files_needing_manual_fix)} files need manual resolution"
                 )
-                for materialized_path, template_path in files_needing_manual_fix:
-                    click.echo(f"  {materialized_path} → {template_path}")
-        else:
-            # In check mode, just show what would happen
-            if files_to_copy or files_needing_manual_fix:
-                click.echo("\nWould make the following changes:")
-                if files_to_copy:
-                    click.echo(f"  Copy {len(files_to_copy)} files back to template")
-                if files_needing_manual_fix:
-                    click.echo(
-                        f"  {len(files_needing_manual_fix)} files need manual resolution"
-                    )
-                click.echo("\nTo apply changes, run: fix-template")
+            console.print("\nTo apply changes, run: fix-template")
 
 
 def map_materialized_to_template_path(script_dir: Path, materialized_path: str) -> str:
@@ -554,9 +627,15 @@ def map_materialized_to_template_path(script_dir: Path, materialized_path: str) 
     # Handle the special case of src/{computed_name}/ → src/{{ project_name_snake }}/
     variables = parse_template_variables()
     project_name_snake = variables.get("project_name_snake", "test_proj")
-    if len(path_parts) >= 2 and path_parts[0] == "src" and path_parts[1] == project_name_snake:
+    if (
+        len(path_parts) >= 2
+        and path_parts[0] == "src"
+        and path_parts[1] == project_name_snake
+    ):
         # Replace computed name with the template variable
-        new_parts: tuple[str, ...] = ("src", "{{ project_name_snake }}") + path_parts[2:]
+        new_parts: tuple[str, ...] = ("src", "{{ project_name_snake }}") + path_parts[
+            2:
+        ]
         template_path: str = str(Path(*new_parts))
 
         # Check if a .jinja version exists
@@ -581,29 +660,41 @@ def cli() -> None:
 
 def regenerate_test_proj(script_dir: Path) -> None:
     """Regenerate the test-proj directory using copier."""
-    # Delete the test-proj directory if it exists
     test_proj_dir: Path = script_dir / "test-proj"
+    
+    # Parse template variables before deleting the directory
+    variables = parse_template_variables() if test_proj_dir.exists() else {}
+    
+    # Delete the test-proj directory if it exists
     if test_proj_dir.exists():
-        click.echo(f"Deleting {test_proj_dir}")
+        console.print(f"Deleting {test_proj_dir}")
         shutil.rmtree(test_proj_dir)
     else:
-        click.echo(f"Directory {test_proj_dir} does not exist")
+        console.print(f"Directory {test_proj_dir} does not exist")
 
     # Run copier to regenerate test-proj
-    click.echo("Running copier to regenerate test-proj...")
-    copier.run_copy(
-        src_path=str(script_dir),
-        dst_path=str(test_proj_dir),
-        data=parse_template_variables(),
-        unsafe=True,
-    )
+    with console.status("[bold green]Running copier to regenerate test-proj..."):
+        run_copier_quietly(
+            str(script_dir),
+            str(test_proj_dir),
+            variables,
+        )
+    
+    # Revert the .copier-answers.yml file since it gets updated with new revision info
+    answers_file = test_proj_dir / ".copier-answers.yml"
+    if answers_file.exists():
+        try:
+            run_git_command(["git", "restore", str(answers_file)], cwd=script_dir)
+        except SystemExit:
+            # If git restore fails (e.g., file not tracked), just continue
+            pass
 
 
 def get_script_dir_and_setup() -> Path:
     """Get the script directory and set up working directory. Common setup for all commands."""
     script_dir: Path = Path(__file__).parent.parent
     os.chdir(script_dir)
-    click.echo(f"Working directory: {script_dir}")
+    console.print(f"Working directory: {script_dir}")
     return script_dir
 
 
@@ -611,9 +702,9 @@ def ensure_test_proj_exists(script_dir: Path) -> Path:
     """Ensure test-proj directory exists and return its path."""
     test_proj_dir: Path = script_dir / "test-proj"
     if not test_proj_dir.exists():
-        click.echo(
+        console.print(
             "Error: test-proj directory does not exist. Run 'regenerate' first.",
-            err=True,
+            style="bold red",
         )
         sys.exit(1)
     return test_proj_dir
@@ -625,20 +716,20 @@ def regenerate() -> None:
     script_dir: Path = get_script_dir_and_setup()
 
     # Check for uncommitted changes before starting
-    click.echo("Checking for uncommitted changes...")
+    console.print("Checking for uncommitted changes...")
     git_status_check: subprocess.CompletedProcess[str] = run_git_command(
         ["git", "status", "--porcelain"], cwd=script_dir
     )
     if git_status_check.stdout.strip():
-        click.echo(
+        console.print(
             "Error: Repository has uncommitted changes. Please commit or stash them first.",
-            err=True,
+            style="bold red",
         )
-        click.echo(git_status_check.stdout)
+        console.print(git_status_check.stdout)
         sys.exit(1)
 
     regenerate_test_proj(script_dir)
-    click.echo("✓ test-proj regenerated")
+    console.print("✓ test-proj regenerated")
 
 
 @cli.command()
@@ -649,40 +740,40 @@ def check_regeneration() -> None:
     regenerate_test_proj(script_dir)
 
     # Check if generated files match template
-    click.echo("Checking generated files against template...")
+    console.print("Checking generated files against template...")
     git_status: subprocess.CompletedProcess[str] = run_git_command(
         ["git", "status", "--porcelain"], cwd=script_dir
     )
 
     if git_status.stdout.strip():
-        click.echo("\n❌ Generated files do not match template!", err=True)
-        click.echo("\nFiles that differ:")
-        click.echo(git_status.stdout)
+        console.print("\n❌ Generated files do not match template!", style="bold red")
+        console.print("\nFiles that differ:")
+        console.print(git_status.stdout)
 
-        click.echo("\nDifferences:")
+        console.print("\nDifferences:")
         git_diff: subprocess.CompletedProcess[str] = run_git_command(
             ["git", "diff"], cwd=script_dir
         )
-        click.echo(git_diff.stdout)
+        console.print(git_diff.stdout)
 
-        click.echo(
+        console.print(
             "\nTo fix: If these changes look good, likely you just need to run regenerate and commit the changes.",
-            err=True,
+            style="bold red",
         )
         sys.exit(1)
     else:
-        click.echo("✓ Generated files match template")
+        console.print("✓ Generated files match template")
 
 
 def run_python_checks(test_proj_dir: Path, fix: bool) -> None:
     """Run Python validation checks on test-proj using hatch."""
     # Run Python checks with hatch
-    click.echo("Running Python validation checks...")
+    console.print("Running Python validation checks...")
     run_git_command(
         ["uv", "run", "hatch", "run", "all-fix" if fix else "all-check"],
         cwd=test_proj_dir,
     )
-    click.echo("✓ Python checks passed")
+    console.print("✓ Python checks passed")
 
 
 @cli.command("check-python")
@@ -700,16 +791,13 @@ def run_javascript_checks(test_proj_dir: Path, fix: bool) -> None:
 
     # Check if ui directory exists
     if not ui_dir.exists():
-        click.echo(
-            "Error: test-proj/ui directory does not exist.",
-            err=True,
-        )
+        console.print("Error: test-proj/ui directory does not exist.", style="bold red")
         sys.exit(1)
 
     # Run TypeScript checks with pnpm
-    click.echo("Running TypeScript validation checks...")
+    console.print("Running TypeScript validation checks...")
     run_git_command(["pnpm", "run", "all-fix" if fix else "all-check"], cwd=ui_dir)
-    click.echo("✓ TypeScript checks passed")
+    console.print("✓ TypeScript checks passed")
 
 
 @cli.command("check-javascript")
