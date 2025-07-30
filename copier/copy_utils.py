@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional, List
 import click
@@ -31,6 +32,126 @@ def run_git_command(
         click.echo(f"stdout: {e.stdout}", err=True)
         click.echo(f"stderr: {e.stderr}", err=True)
         sys.exit(1)
+
+
+def get_merge_base_with_main(script_dir: Path) -> str:
+    """Get merge base with main as default revision."""
+    try:
+        result = run_git_command(["git", "merge-base", "HEAD", "main"], cwd=script_dir)
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        # Fallback to main if merge-base fails
+        click.echo("Warning: Could not determine merge base with main, using 'main'")
+        return "main"
+
+
+def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
+    """Compare two directories and return list of files that differ."""
+    differences = []
+    
+    # Get all files in both directories
+    expected_files = set()
+    actual_files = set()
+    
+    if expected_dir.exists():
+        for file_path in expected_dir.rglob("*"):
+            if file_path.is_file():
+                expected_files.add(file_path.relative_to(expected_dir))
+    
+    if actual_dir.exists():
+        for file_path in actual_dir.rglob("*"):
+            if file_path.is_file():
+                actual_files.add(file_path.relative_to(actual_dir))
+    
+    # Check for files only in expected
+    for file_path in expected_files - actual_files:
+        differences.append(f"Missing file: {file_path}")
+    
+    # Check for files only in actual
+    for file_path in actual_files - expected_files:
+        differences.append(f"Extra file: {file_path}")
+    
+    # Check for files that exist in both but differ
+    for file_path in expected_files & actual_files:
+        expected_file = expected_dir / file_path
+        actual_file = actual_dir / file_path
+        
+        # Compare file contents
+        try:
+            with open(expected_file, 'r', encoding='utf-8') as f:
+                expected_content = f.read()
+            with open(actual_file, 'r', encoding='utf-8') as f:
+                actual_content = f.read()
+            
+            if expected_content != actual_content:
+                differences.append(f"Content differs: {file_path}")
+        except (UnicodeDecodeError, PermissionError):
+            # For binary files or permission issues, use basic comparison
+            if expected_file.stat().st_size != actual_file.stat().st_size:
+                differences.append(f"Content differs (binary): {file_path}")
+    
+    return differences
+
+
+def compare_with_expected_materialized(script_dir: Path) -> None:
+    """Compare current test-proj with freshly generated template."""
+    click.echo("Generating expected materialized version from current template...")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        expected_proj = Path(temp_dir) / "expected-proj"
+        
+        # Generate expected materialized version
+        copier.run_copy(
+            src_path=str(script_dir),
+            dst_path=str(expected_proj),
+            data={"project_name": "test-proj", "project_title": "Test Project"},
+            unsafe=True,
+        )
+        
+        # Compare expected vs actual
+        test_proj_dir = script_dir / "test-proj"
+        differences = compare_directories(expected_proj, test_proj_dir)
+        
+        if not differences:
+            click.echo("✓ test-proj matches expected template output")
+            return
+        
+        click.echo(f"\n❌ Found {len(differences)} differences between expected and actual:")
+        for diff in differences:
+            click.echo(f"  {diff}")
+        
+        # For files that differ in content, show detailed diff
+        click.echo("\nDetailed differences:")
+        for diff in differences:
+            if diff.startswith("Content differs: "):
+                file_path = diff[len("Content differs: "):]
+                expected_file = expected_proj / file_path
+                actual_file = test_proj_dir / file_path
+                
+                click.echo(f"\n--- Expected (from template): {file_path}")
+                click.echo(f"+++ Actual (in test-proj): {file_path}")
+                
+                # Use git diff for better output
+                try:
+                    result = subprocess.run(
+                        ["git", "diff", "--no-index", str(expected_file), str(actual_file)],
+                        capture_output=True, text=True, cwd=script_dir
+                    )
+                    # git diff returns 1 when files differ, which is expected
+                    if result.stdout:
+                        # Skip the file headers and show just the content diff
+                        lines = result.stdout.split('\n')
+                        for line in lines[4:]:  # Skip first 4 lines (headers)
+                            if line.strip():
+                                click.echo(f"  {line}")
+                except subprocess.CalledProcessError:
+                    # Fallback to basic diff indication
+                    click.echo("  (Files differ)")
+        
+        # Provide guidance on next steps
+        click.echo("\nTo fix template files, you can:")
+        click.echo("1. Copy non-templated files: run fix_template with --legacy-mode")
+        click.echo("2. Manually update .jinja files based on the differences shown above")
 
 
 def fix_template_from_materialized(script_dir: Path, revision: str) -> None:
@@ -250,23 +371,40 @@ def check_javascript(fix: bool) -> None:
 
 
 @cli.command()
-@click.argument("revision")
-def fix_template(revision: str) -> None:
-    """Fix template files by copying back files changed since REVISION from materialized test-proj."""
+@click.argument("revision", required=False)
+@click.option("--legacy-mode", is_flag=True, help="Use legacy git-diff based approach instead of expected materialized comparison.")
+def fix_template(revision: Optional[str], legacy_mode: bool) -> None:
+    """Fix template files by copying back changes from materialized test-proj.
+    
+    By default, compares test-proj with what the current template would generate.
+    REVISION is optional and defaults to merge-base with main when using legacy mode.
+    """
     script_dir: Path = get_script_dir_and_setup()
-
-    # Validate that the revision exists
-    try:
-        run_git_command(["git", "rev-parse", "--verify", revision], cwd=script_dir)
-    except subprocess.CalledProcessError:
-        click.echo(f"Error: Revision '{revision}' not found", err=True)
-        sys.exit(1)
 
     # Check if test-proj exists
     ensure_test_proj_exists(script_dir)
 
-    # Fix template files based on changes since revision
-    fix_template_from_materialized(script_dir, revision)
+    if legacy_mode:
+        # Use the original git-diff based approach
+        if revision is None:
+            revision = get_merge_base_with_main(script_dir)
+            click.echo(f"Using auto-detected revision: {revision}")
+
+        # Validate that the revision exists
+        try:
+            run_git_command(["git", "rev-parse", "--verify", revision], cwd=script_dir)
+        except subprocess.CalledProcessError:
+            click.echo(f"Error: Revision '{revision}' not found", err=True)
+            sys.exit(1)
+
+        # Fix template files based on changes since revision
+        fix_template_from_materialized(script_dir, revision)
+    else:
+        # Use new expected materialized comparison approach
+        if revision is not None:
+            click.echo("Warning: revision argument ignored when not using --legacy-mode")
+        
+        compare_with_expected_materialized(script_dir)
 
 
 if __name__ == "__main__":

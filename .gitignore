@@ -1,5 +1,6 @@
 test-proj/uv.lock
 uv.lock
+expected-proj
 test-proj/.copier-answers.yml
 test-proj/ui/node_modules
 test-proj/ui/pnpm-lock.yaml
