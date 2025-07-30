@@ -47,7 +47,7 @@ git commit -m "WIP: Implement new feature in test-proj"
 
 ### 4. Propagate Changes to the Template
 
-Use the `fix-template` command to automatically copy your changes from `test-proj` back into the template source files. The enhanced command compares your current `test-proj` against what the current template would generate, showing only meaningful differences.
+Use the `fix-template` command to automatically copy your changes from `test-proj` back into the template source files. It compares `test-proj` against what the current template would generate, showing only meaningful differences.
 
 ```bash
 # Check what would change (recommended first step)
@@ -57,22 +57,21 @@ Use the `fix-template` command to automatically copy your changes from `test-pro
 ./copier/copy_utils.py fix-template
 ```
 
-The enhanced `fix-template` provides:
+`fix-template` provides:
 
-- **Smart Comparison**: Compares against freshly generated template output, eliminating false positives
-- **Automatic Jinja Resolution**: Automatically resolves simple template variable changes (project names, versions, etc.)
+- **Automatic Jinja Resolution**: Resolves simple template variable changes (project names, versions, etc.)
 - **Gitignore Respect**: Only considers files that would be tracked by git, ignoring build artifacts
 - **Selective Copying**: Copies non-templated files and auto-resolved template files back to the template
 
 ### 5. Handle Remaining Manual Updates
 
-For complex `.jinja` files that couldn't be auto-resolved, you'll need manual intervention:
+For complex `.jinja` files that can't be auto-resolved, you'll need manual intervention:
 
 1. Open the modified file in `test-proj` (e.g., `test-proj/pyproject.toml`)
 2. Open the corresponding template file (e.g., `pyproject.toml.jinja`)
 3. Carefully apply the changes, ensuring you retain or add the necessary Jinja templating logic
 
-The tool will clearly indicate which files need manual resolution.
+The tool will indicate which files need manual resolution.
 
 ### 6. Verify Template Integrity
 
