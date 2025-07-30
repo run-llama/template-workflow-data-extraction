@@ -17,12 +17,12 @@ from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 import click
 import copier
-from copier._main import Worker  # Private API but essential for computed variables
+from copier.template import Template
 import yaml
 
 
 def parse_template_variables() -> Dict[str, str]:
-    """Parse template variables using Copier's Worker to get computed values."""
+    """Parse template variables using Copier's Jinja environment."""
     script_dir = Path(__file__).parent.parent
     
     # Read answers from existing materialized project
@@ -36,17 +36,47 @@ def parse_template_variables() -> Dict[str, str]:
             k: v for k, v in answers_data.items() if not k.startswith("_")
         }
     
-    # Use Worker to get ALL variables (including computed ones like project_name_snake)
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        with Worker(
-            src_path=str(script_dir),
-            dst_path=tmp_dir,
-            data=user_answers,
-            quiet=True
-        ) as worker:
-            # Worker.data contains all variables after Copier computes them
-            return dict(worker.data)
+    # Get template and create Jinja environment with template's configuration
+    template = Template(url=str(script_dir))
+    
+    # Create Jinja environment with the same configuration as Copier would use
+    import jinja2
+    jinja_env = jinja2.Environment(
+        loader=jinja2.BaseLoader(),
+        extensions=template.jinja_extensions,
+        **template.envops
+    )
+    
+    # Build complete variable context by evaluating template defaults
+    result = dict(user_answers)
+    
+    # Multiple passes to handle dependencies between computed variables
+    max_iterations = 10
+    for iteration in range(max_iterations):
+        changed = False
+        for question_name, question_config in template.questions_data.items():
+            if question_name not in result and "default" in question_config:
+                default_value = question_config["default"]
+                if isinstance(default_value, str) and "{{" in default_value:
+                    # Evaluate Jinja expression using our environment
+                    try:
+                        rendered = jinja_env.from_string(default_value).render(**result)
+                        result[question_name] = rendered
+                        changed = True
+                    except Exception as e:
+                        print(f"Error evaluating {default_value} for {question_name}")
+                        print(e)
+                        # Skip variables that can't be evaluated yet
+                        pass
+                else:
+                    result[question_name] = default_value
+                    changed = True
+        
+        # Stop if no new variables were computed
+        if not changed:
+            break
+    print(f"result: {result}")
+    return result
 
 
 def find_simple_jinja_patterns(template_line: str) -> List[Tuple[str, str]]:
