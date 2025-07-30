@@ -24,3 +24,4 @@ _exclude:
   - ".git"
   - ".github"
   - "copier"
+  - "CONTRIBUTING.md"

@@ -61,7 +61,6 @@ def get_data_client() -> AsyncAgentDataClient:
     )
 
 
-
 @functools.lru_cache(maxsize=None)
 def get_llama_cloud_client():
     return AsyncLlamaCloud(

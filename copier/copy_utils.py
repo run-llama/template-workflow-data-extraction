@@ -215,20 +215,22 @@ def check_regeneration() -> None:
 
 
 @cli.command("check-python")
-def check_python() -> None:
+@click.option("--fix", is_flag=True, help="Fix formatting issues automatically.")
+def check_python(fix: bool) -> None:
     """Run Python validation checks on test-proj using hatch."""
     script_dir: Path = get_script_dir_and_setup()
     test_proj_dir: Path = ensure_test_proj_exists(script_dir)
 
     # Run Python checks with hatch
     click.echo("Running Python validation checks...")
-    run_git_command(["uv", "run", "hatch", "run", "all"], cwd=test_proj_dir)
+    run_git_command(["uv", "run", "hatch", "run", "all-fix" if fix else "all-check"], cwd=test_proj_dir)
     click.echo("✓ Python checks passed")
 
 
-@cli.command("check-typescript")
-def check_typescript() -> None:
-    """Run TypeScript validation checks on test-proj/ui using pnpm."""
+@cli.command("check-javascript")
+@click.option("--fix", is_flag=True, help="Fix formatting issues automatically.")
+def check_javascript(fix: bool) -> None:
+    """Run TypeScript and format validation checks on test-proj/ui using pnpm."""
     script_dir: Path = get_script_dir_and_setup()
     test_proj_dir: Path = ensure_test_proj_exists(script_dir)
     ui_dir: Path = test_proj_dir / "ui"
@@ -243,7 +245,7 @@ def check_typescript() -> None:
 
     # Run TypeScript checks with pnpm
     click.echo("Running TypeScript validation checks...")
-    run_git_command(["pnpm", "run", "all"], cwd=ui_dir)
+    run_git_command(["pnpm", "run", "all-fix" if fix else "all-check"], cwd=ui_dir)
     click.echo("✓ TypeScript checks passed")
 
 
