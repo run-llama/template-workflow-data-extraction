@@ -106,12 +106,7 @@ export default function ItemPage() {
           <FilePreview
             fileId={itemData.data.file_id}
             onBoundingBoxClick={(box, pageNumber) => {
-              console.log(
-                "Bounding box clicked:",
-                box,
-                "on page:",
-                pageNumber
-              );
+              console.log("Bounding box clicked:", box, "on page:", pageNumber);
             }}
           />
         )}
@@ -134,7 +129,9 @@ export default function ItemPage() {
           <ExtractedDataDisplay
             data={(data as Record<string, unknown>) || {}}
             confidence={
-              (itemData.data.confidence as Record<string, number>) || {}
+              {
+                /** TODO: add confidence and page citations */
+              }
             }
             title="Extracted Data"
             onChange={(updatedData) => {

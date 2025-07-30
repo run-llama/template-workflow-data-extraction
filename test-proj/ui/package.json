@@ -15,7 +15,7 @@
     "@babel/runtime": "^7.27.6",
     "@lezer/highlight": "^1.2.1",
     "@llamaindex/chat-ui": "^0.5.16",
-    "@llamaindex/cloud": "^4.0.26",
+    "@llamaindex/cloud": "^4.0.28",
     "@llamaindex/ui": "^0.3.2",
     "@radix-ui/themes": "^3.2.1",
     "class-variance-authority": "^0.7.1",

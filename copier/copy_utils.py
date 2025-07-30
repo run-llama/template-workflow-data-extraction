@@ -206,7 +206,7 @@ def check_regeneration() -> None:
         click.echo(git_diff.stdout)
 
         click.echo(
-            "\nTo fix: Update the template files to match the current test-proj output",
+            "\nTo fix: If these changes look good, likely you just need to run regenerate and commit the changes.",
             err=True,
         )
         sys.exit(1)
