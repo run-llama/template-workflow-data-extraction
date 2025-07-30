@@ -389,7 +389,7 @@ def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
 
 
 def compare_with_expected_materialized(
-    script_dir: Path, check_mode: bool = False
+    script_dir: Path, fix_mode: bool = False
 ) -> None:
     """Compare current test-proj with freshly generated template."""
     click.echo("Generating expected materialized version from current template...")
@@ -485,10 +485,10 @@ def compare_with_expected_materialized(
 
                     if auto_resolved_content:
                         # Accept the auto-resolution (our logic is conservative enough)
-                        if check_mode:
-                            click.echo(f"  ✓ Would auto-resolve: {template_file_path}")
-                        else:
+                        if fix_mode:
                             click.echo(f"  ✓ Auto-resolved: {template_file_path}")
+                        else:
+                            click.echo(f"  ✓ Would auto-resolve: {template_file_path}")
                         files_to_copy.append(
                             (
                                 str(file_path),
@@ -539,18 +539,7 @@ def compare_with_expected_materialized(
                     )
 
         # Provide guidance and optionally fix
-        if check_mode:
-            # In check mode, just show what would happen
-            if files_to_copy or files_needing_manual_fix:
-                click.echo("\nWould make the following changes:")
-                if files_to_copy:
-                    click.echo(f"  Copy {len(files_to_copy)} files back to template")
-                if files_needing_manual_fix:
-                    click.echo(
-                        f"  {len(files_needing_manual_fix)} files need manual resolution"
-                    )
-                click.echo("\nTo apply changes, run: fix-template")
-        else:
+        if fix_mode:
             # Actually fix the files
             if files_to_copy:
                 click.echo(f"\nCopying {len(files_to_copy)} files back to template:")
@@ -578,6 +567,17 @@ def compare_with_expected_materialized(
                 )
                 for materialized_path, template_path in files_needing_manual_fix:
                     click.echo(f"  {materialized_path} → {template_path}")
+        else:
+            # In check mode, just show what would happen
+            if files_to_copy or files_needing_manual_fix:
+                click.echo("\nWould make the following changes:")
+                if files_to_copy:
+                    click.echo(f"  Copy {len(files_to_copy)} files back to template")
+                if files_needing_manual_fix:
+                    click.echo(
+                        f"  {len(files_needing_manual_fix)} files need manual resolution"
+                    )
+                click.echo("\nTo apply changes, run: fix-template")
 
 
 def map_materialized_to_template_path(script_dir: Path, materialized_path: str) -> str:
@@ -713,13 +713,8 @@ def check_regeneration() -> None:
         click.echo("✓ Generated files match template")
 
 
-@cli.command("check-python")
-@click.option("--fix", is_flag=True, help="Fix formatting issues automatically.")
-def check_python(fix: bool) -> None:
+def run_python_checks(test_proj_dir: Path, fix: bool) -> None:
     """Run Python validation checks on test-proj using hatch."""
-    script_dir: Path = get_script_dir_and_setup()
-    test_proj_dir: Path = ensure_test_proj_exists(script_dir)
-
     # Run Python checks with hatch
     click.echo("Running Python validation checks...")
     run_git_command(
@@ -729,12 +724,17 @@ def check_python(fix: bool) -> None:
     click.echo("✓ Python checks passed")
 
 
-@cli.command("check-javascript")
+@cli.command("check-python")
 @click.option("--fix", is_flag=True, help="Fix formatting issues automatically.")
-def check_javascript(fix: bool) -> None:
-    """Run TypeScript and format validation checks on test-proj/ui using pnpm."""
+def check_python(fix: bool) -> None:
+    """Run Python validation checks on test-proj using hatch."""
     script_dir: Path = get_script_dir_and_setup()
     test_proj_dir: Path = ensure_test_proj_exists(script_dir)
+    run_python_checks(test_proj_dir, fix)
+
+
+def run_javascript_checks(test_proj_dir: Path, fix: bool) -> None:
+    """Run TypeScript and format validation checks on test-proj/ui using pnpm."""
     ui_dir: Path = test_proj_dir / "ui"
 
     # Check if ui directory exists
@@ -751,13 +751,27 @@ def check_javascript(fix: bool) -> None:
     click.echo("✓ TypeScript checks passed")
 
 
+@cli.command("check-javascript")
+@click.option("--fix", is_flag=True, help="Fix formatting issues automatically.")
+def check_javascript(fix: bool) -> None:
+    """Run TypeScript and format validation checks on test-proj/ui using pnpm."""
+    script_dir: Path = get_script_dir_and_setup()
+    test_proj_dir: Path = ensure_test_proj_exists(script_dir)
+    run_javascript_checks(test_proj_dir, fix)
+
+
 @cli.command()
 @click.option(
-    "--check",
+    "--fix",
     is_flag=True,
-    help="Show differences without making changes.",
+    help="Fix template files by copying back changes from materialized test-proj.",
 )
-def fix_template(check: bool) -> None:
+@click.option(
+    "--fix-format",
+    is_flag=True,
+    help="Run Python and JavaScript formatters before fixing template files. Implies --fix.",
+)
+def check_template(fix: bool, fix_format: bool) -> None:
     """Fix template files by copying back changes from materialized test-proj.
 
     Compares test-proj with what the current template would generate and fixes differences.
@@ -765,11 +779,21 @@ def fix_template(check: bool) -> None:
     """
     script_dir: Path = get_script_dir_and_setup()
 
+    # Validate options
+    if fix_format:
+        # implies fix
+        fix = True
+
     # Check if test-proj exists
-    ensure_test_proj_exists(script_dir)
+    test_proj_dir: Path = ensure_test_proj_exists(script_dir)
+
+    # Run formatters if requested
+    if fix_format:
+        run_python_checks(test_proj_dir, fix=True)
+        run_javascript_checks(test_proj_dir, fix=True)
 
     # Use expected materialized comparison approach
-    compare_with_expected_materialized(script_dir, check_mode=check)
+    compare_with_expected_materialized(script_dir, fix_mode=fix)
 
 
 if __name__ == "__main__":

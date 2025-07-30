@@ -7,10 +7,10 @@
     "build": "next build --experimental-build-mode compile",
     "start": "next start",
     "lint": "tsc --noEmit",
-    "format": "prettier --write",
+    "format": "prettier --write src",
     "format-check": "prettier --check src",
     "all-check": "pnpm i && pnpm run lint && pnpm run format-check && pnpm run build",
-    "all-fix": "pnpm i && pnpm run lint && pnpm run format-fix && pnpm run build"
+    "all-fix": "pnpm i && pnpm run lint && pnpm run format && pnpm run build"
   },
   "dependencies": {
     "@babel/runtime": "^7.27.6",

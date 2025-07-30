@@ -8,7 +8,7 @@ import { data } from "@/lib/data";
 
 export default function Home() {
   const lastMonth = new Date(
-    new Date().setMonth(new Date().getMonth() - 1)
+    new Date().setMonth(new Date().getMonth() - 1),
   ).toISOString();
   const router = useRouter();
   const goToItem = (item: TypedAgentData) => {

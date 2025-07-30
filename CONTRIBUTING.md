@@ -51,10 +51,13 @@ Use the `fix-template` command to automatically copy your changes from `test-pro
 
 ```bash
 # Check what would change (recommended first step)
-./copier/copy_utils.py fix-template --check
+./copier/copy_utils.py check-template
 
 # Apply changes automatically
-./copier/copy_utils.py fix-template
+./copier/copy_utils.py check-template --fix
+
+# or "fix everything from the materialized
+./copier/copy_utils.py check-template --fix-format
 ```
 
 `fix-template` provides:
