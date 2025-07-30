@@ -12,11 +12,11 @@ export const ToolbarCtx = React.createContext<{
   setButtons: (fn: (prev: React.ReactNode[]) => React.ReactNode[]) => void;
   breadcrumbs: BreadcrumbItem[];
   setBreadcrumbs: (items: BreadcrumbItem[]) => void;
-}>({ 
-  buttons: [], 
+}>({
+  buttons: [],
   setButtons: () => {},
   breadcrumbs: [],
-  setBreadcrumbs: () => {}
+  setBreadcrumbs: () => {},
 });
 
 export const ToolbarProvider = ({
@@ -26,11 +26,13 @@ export const ToolbarProvider = ({
 }) => {
   const [buttons, setButtons] = React.useState<React.ReactNode[]>([]);
   const [breadcrumbs, setBreadcrumbs] = React.useState<BreadcrumbItem[]>([
-    { label: APP_TITLE, href: "/" }
+    { label: APP_TITLE, href: "/" },
   ]);
-  
+
   return (
-    <ToolbarCtx.Provider value={{ buttons, setButtons, breadcrumbs, setBreadcrumbs }}>
+    <ToolbarCtx.Provider
+      value={{ buttons, setButtons, breadcrumbs, setBreadcrumbs }}
+    >
       {children}
     </ToolbarCtx.Provider>
   );

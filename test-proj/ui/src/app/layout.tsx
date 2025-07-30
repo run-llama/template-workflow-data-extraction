@@ -49,7 +49,7 @@ export default function RootLayout({
 
 const Toolbar = () => {
   const { buttons, breadcrumbs } = useToolbar();
-  
+
   return (
     <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
       <Breadcrumb>
@@ -63,7 +63,9 @@ const Toolbar = () => {
                     {item.label}
                   </Link>
                 ) : (
-                  <span className={`font-medium ${index === 0 ? 'text-base' : ''}`}>
+                  <span
+                    className={`font-medium ${index === 0 ? "text-base" : ""}`}
+                  >
                     {item.label}
                   </span>
                 )}
