@@ -26,3 +26,7 @@ _exclude:
   - "copier"
   - "CONTRIBUTING.md"
   - "copier.yaml"
+  # Development files - these exist for local development but should not be copied by copier
+  # The .jinja versions are the actual template sources
+  - "ui/package.json"
+  - "ui/src/lib/config.ts"

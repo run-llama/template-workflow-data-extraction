@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   AcceptReject,
   ExtractedDataDisplay,
@@ -17,7 +17,6 @@ import { APP_TITLE } from "@/lib/config";
 
 export default function ItemPage() {
   const { itemId } = useParams<{ itemId: string }>();
-  const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
   const { setButtons, setBreadcrumbs } = useToolbar();
 
   // Use the hook to fetch item data
