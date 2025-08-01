@@ -1,18 +1,17 @@
-"use client";
 import { ItemGrid, ItemCount } from "@llamaindex/ui";
 import type { TypedAgentData } from "@llamaindex/cloud/beta/agent";
-import styles from "./page.module.css";
-import { useRouter } from "next/navigation";
+import styles from "./HomePage.module.css";
+import { useNavigate } from "react-router-dom";
 import TriggerFileWorkflow from "@/components/workflow-trigger";
 import { data } from "@/lib/data";
 
-export default function Home() {
+export default function HomePage() {
   const lastMonth = new Date(
     new Date().setMonth(new Date().getMonth() - 1),
   ).toISOString();
-  const router = useRouter();
+  const navigate = useNavigate();
   const goToItem = (item: TypedAgentData) => {
-    router.push(`/item/${item.id}`);
+    navigate(`/item/${item.id}`);
   };
   return (
     <div className={styles.page}>

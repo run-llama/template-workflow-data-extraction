@@ -1,7 +1,5 @@
-"use client";
-import "@/lib/client";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import React from "react";
+import { Routes, Route } from "react-router-dom";
 import { Theme } from "@radix-ui/themes";
 import {
   Breadcrumb,
@@ -9,41 +7,31 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@llamaindex/ui";
-import Link from "next/link";
-import React from "react";
+import { Link } from "react-router-dom";
 import { Toaster } from "@llamaindex/ui";
 import { useToolbar, ToolbarProvider } from "@/lib/ToolbarContext";
-import "@llamaindex/ui/styles.css";
+import "@/lib/client";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+// Import pages
+import HomePage from "./pages/HomePage";
+import ItemPage from "./pages/ItemPage";
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function App() {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <Theme>
-          <ToolbarProvider>
-            <div className="grid grid-rows-[auto_1fr] h-screen">
-              <Toolbar />
-              <main className="overflow-auto">{children}</main>
-            </div>
-            <Toaster />
-          </ToolbarProvider>
-        </Theme>
-      </body>
-    </html>
+    <Theme>
+      <ToolbarProvider>
+        <div className="grid grid-rows-[auto_1fr] h-screen">
+          <Toolbar />
+          <main className="overflow-auto">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/item/:itemId" element={<ItemPage />} />
+            </Routes>
+          </main>
+        </div>
+        <Toaster />
+      </ToolbarProvider>
+    </Theme>
   );
 }
 
@@ -59,7 +47,7 @@ const Toolbar = () => {
               {index > 0 && <BreadcrumbSeparator />}
               <BreadcrumbItem>
                 {item.href && !item.isCurrentPage ? (
-                  <Link href={item.href} className="font-medium text-base">
+                  <Link to={item.href} className="font-medium text-base">
                     {item.label}
                   </Link>
                 ) : (
