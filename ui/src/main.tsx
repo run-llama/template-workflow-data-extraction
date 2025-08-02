@@ -5,7 +5,8 @@ import App from "./App";
 import "@llamaindex/ui/styles.css";
 import "./index.css";
 
-const base = `/deployments/${import.meta.env.VITE_AGENT_NAME}/ui`;
+// https://github.com/run-llama/llama_deploy/blob/main/llama_deploy/apiserver/deployment.py#L183
+const base = process.env.LLAMA_DEPLOY_NEXTJS_BASE_PATH ?? "/";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
