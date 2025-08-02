@@ -26,6 +26,6 @@ export default defineConfig(({ mode }) => {
       sourcemap: true,
     },
     base: base,
-    envPrefix: ['VITE_'],
+    envPrefix: ['VITE_', 'LLAMA_DEPLOY_'],
   }
 })
