@@ -1,4 +1,3 @@
-"use client";
 import {
   Button,
   FileUploader,
@@ -33,8 +32,7 @@ export default function TriggerFileWorkflow({
   onSuccess?: (result: any) => void;
 }) {
   const [deployment, setDeployment] = useState<string>("");
-
-  // Make sure it only runs on the client
+  // Get deployment from path or environment
   useEffect(() => {
     const deploymentFromPath = window.location.pathname.split("/")[2];
     setDeployment(deploymentFromPath);

@@ -1,25 +1,22 @@
-"use client";
+import { useEffect } from "react";
 import {
   AcceptReject,
   ExtractedDataDisplay,
   FilePreview,
-  ProcessingSteps,
   useItemData,
 } from "@llamaindex/ui";
 import { Clock, XCircle } from "lucide-react";
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { MySchema } from "../../../schemas/MySchema";
-import MyJsonSchema from "../../../schemas/MySchema.json" with { type: "json" };
+import { useParams } from "react-router-dom";
+import type { MySchema } from "../schemas/MySchema";
+import MyJsonSchema from "../schemas/MySchema.json" with { type: "json" };
 import { useToolbar } from "@/lib/ToolbarContext";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { modifyJsonSchema } from "@llamaindex/ui/lib";
 import { data as dataClient } from "@/lib/data";
 import { APP_TITLE } from "@/lib/config";
 
 export default function ItemPage() {
-  const { itemId } = useParams();
-  const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
+  const { itemId } = useParams<{ itemId: string }>();
   const { setButtons, setBreadcrumbs } = useToolbar();
 
   // Use the hook to fetch item data
@@ -31,7 +28,7 @@ export default function ItemPage() {
     client: dataClient,
   });
 
-  const router = useRouter();
+  const navigate = useNavigate();
 
   // Update breadcrumb when item data loads
   useEffect(() => {
@@ -57,7 +54,7 @@ export default function ItemPage() {
       <div className="ml-auto flex items-center">
         <AcceptReject
           itemData={itemHookData}
-          onComplete={() => router.push("/")}
+          onComplete={() => navigate("/")}
         />
       </div>,
     ]);
@@ -115,16 +112,6 @@ export default function ItemPage() {
       {/* Right Side - Review Panel */}
       <div className="flex-1 bg-white h-full overflow-y-auto">
         <div className="p-4 space-y-4">
-          {/* Processing Steps */}
-          {(itemData as any).workflow_events && (
-            <ProcessingSteps
-              workflowEvents={(itemData as any).workflow_events}
-              isCollapsed={isStepsCollapsed}
-              onToggle={() => setIsStepsCollapsed(!isStepsCollapsed)}
-              title="Workflow Progress"
-            />
-          )}
-
           {/* Extracted Data */}
           <ExtractedDataDisplay
             data={(data as Record<string, unknown>) || {}}

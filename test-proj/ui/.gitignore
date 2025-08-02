@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+/dist/
 
 # production
 /build
@@ -39,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Development files (not part of copier template)
+# These files exist for local development, .jinja versions are template sources
+package.json
+src/lib/config.ts
