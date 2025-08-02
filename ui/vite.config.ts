@@ -1,11 +1,11 @@
-import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const base = env.LLAMA_DEPLOY_NEXTJS_BASE_PATH ?? '/';
+export default defineConfig(({}) => {
+  const deploymentId = process.env.LLAMA_DEPLOY_NEXTJS_DEPLOYMENT_NAME;
+  const basePath = `/deployments/${deploymentId}/ui`;
 
   return {
     plugins: [react()],
@@ -18,14 +18,18 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: true,
       hmr: {
-        port: 3000
-      }
+        port: 3000,
+      },
     },
     build: {
-      outDir: 'dist',
+      outDir: "dist",
       sourcemap: true,
     },
-    base: base,
-    envPrefix: ['VITE_', 'LLAMA_DEPLOY_'],
-  }
-})
+    base: basePath,
+    define: {
+      "import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME":
+        JSON.stringify(deploymentId),
+      "import.meta.env.VITE_LLAMA_DEPLOY_BASE_PATH": JSON.stringify(basePath),
+    },
+  };
+});
