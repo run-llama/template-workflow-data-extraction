@@ -16,11 +16,9 @@
   "dependencies": {
     "@babel/runtime": "^7.27.6",
     "@lezer/highlight": "^1.2.1",
-    "@llamaindex/chat-ui": "^0.5.16",
     "@llamaindex/cloud": "^4.0.28",
-    "@llamaindex/ui": "^0.3.2",
+    "@llamaindex/ui": "file:/Users/terryzhao/work/llama-ui/packages/ui",
     "@radix-ui/themes": "^3.2.1",
-    "@swc/helpers": "^0.5.17",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.514.0",

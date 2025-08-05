@@ -14,12 +14,20 @@ export default defineConfig(({}) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    optimizeDeps: {
+      include: ['@llamaindex/ui'],
+      force: true
+    },
     server: {
       port: 3000,
       host: true,
       hmr: {
         port: 3000,
       },
+      sourcemapIgnoreList: false,
+    },
+    esbuild: {
+      sourcemap: true,
     },
     build: {
       outDir: "dist",

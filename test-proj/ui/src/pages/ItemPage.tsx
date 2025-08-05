@@ -12,7 +12,7 @@ import MyJsonSchema from "../schemas/MySchema.json" with { type: "json" };
 import { useToolbar } from "@/lib/ToolbarContext";
 import { useNavigate } from "react-router-dom";
 import { modifyJsonSchema } from "@llamaindex/ui/lib";
-import { data as dataClient } from "@/lib/data";
+import { agentClient } from "@/lib/client";
 import { APP_TITLE } from "@/lib/config";
 
 export default function ItemPage() {
@@ -25,7 +25,7 @@ export default function ItemPage() {
     jsonSchema: modifyJsonSchema(MyJsonSchema as any, {}),
     itemId: itemId as string,
     isMock: false,
-    client: dataClient,
+    client: agentClient,
   });
 
   const navigate = useNavigate();
