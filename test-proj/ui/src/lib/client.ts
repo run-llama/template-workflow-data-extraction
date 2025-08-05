@@ -1,7 +1,12 @@
 import { MySchema } from "@/schemas/MySchema";
 import { ExtractedData } from "@llamaindex/cloud/beta/agent";
 import { ApiClients } from "@llamaindex/ui";
-import { createCloudAgentClient, createLlamaDeployClient, createLlamaDeployConfig, cloudApiClient } from "@llamaindex/ui";
+import {
+  createCloudAgentClient,
+  createLlamaDeployClient,
+  createLlamaDeployConfig,
+  cloudApiClient,
+} from "@llamaindex/ui";
 import { EXTRACTED_DATA_COLLECTION } from "./config";
 
 const platformToken = import.meta.env.VITE_LLAMA_CLOUD_API_KEY;

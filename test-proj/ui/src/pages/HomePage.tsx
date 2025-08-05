@@ -1,4 +1,9 @@
-import { ItemGrid, ItemCount, WorkflowTrigger, WorkflowProgressBar } from "@llamaindex/ui";
+import {
+  ItemGrid,
+  ItemCount,
+  WorkflowTrigger,
+  WorkflowProgressBar,
+} from "@llamaindex/ui";
 import type { TypedAgentData } from "@llamaindex/cloud/beta/agent";
 import styles from "./HomePage.module.css";
 import { useNavigate } from "react-router-dom";
@@ -41,11 +46,14 @@ export default function HomePage() {
           />
         </div>
         <div className={styles.commandBar}>
-          <WorkflowTrigger deployment={deployment} customWorkflowInput={(files) => {
-            return {
-              fileId: files[0].fileId
-            }
-          }} />
+          <WorkflowTrigger
+            deployment={deployment}
+            customWorkflowInput={(files) => {
+              return {
+                fileId: files[0].fileId,
+              };
+            }}
+          />
         </div>
         <WorkflowProgressBar className={styles.progressBar} />
         <ItemGrid
