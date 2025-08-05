@@ -17,7 +17,7 @@
     "@babel/runtime": "^7.27.6",
     "@lezer/highlight": "^1.2.1",
     "@llamaindex/cloud": "^4.0.28",
-    "@llamaindex/ui": "file:/Users/terryzhao/work/llama-ui/packages/ui",
+    "@llamaindex/ui": "^0.4.0",
     "@radix-ui/themes": "^3.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
