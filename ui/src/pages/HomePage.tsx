@@ -48,9 +48,10 @@ export default function HomePage() {
         <div className={styles.commandBar}>
           <WorkflowTrigger
             deployment={deployment}
+            workflow="process-file"
             customWorkflowInput={(files) => {
               return {
-                fileId: files[0].fileId,
+                file_id: files[0].fileId,
               };
             }}
           />
