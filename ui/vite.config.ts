@@ -6,6 +6,7 @@ import path from "path";
 export default defineConfig(({}) => {
   const deploymentId = process.env.LLAMA_DEPLOY_NEXTJS_DEPLOYMENT_NAME;
   const basePath = `/deployments/${deploymentId}/ui`;
+  const projectId = process.env.LLAMA_DEPLOY_PROJECT_ID;
 
   return {
     plugins: [react()],
@@ -30,6 +31,10 @@ export default defineConfig(({}) => {
       "import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME":
         JSON.stringify(deploymentId),
       "import.meta.env.VITE_LLAMA_DEPLOY_BASE_PATH": JSON.stringify(basePath),
+      ...(projectId && {
+        "import.meta.env.VITE_LLAMA_CLOUD_PROJECT_ID":
+          JSON.stringify(projectId),
+      }),
     },
   };
 });
