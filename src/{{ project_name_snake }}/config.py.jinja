@@ -28,7 +28,7 @@ extracted_data_collection = "{{ project_name }}"
 def get_extract_agent() -> ExtractionAgent:
     extract_api = LlamaExtract(api_key=api_key, base_url=base_url)
     config = ExtractConfig(
-        extraction_mode=ExtractMode.BALANCED,
+        extraction_mode=ExtractMode.PREMIUM,
         system_prompt=None,
         # advanced
         use_reasoning=False,
