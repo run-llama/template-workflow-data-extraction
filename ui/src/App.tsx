@@ -6,11 +6,13 @@ import {
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbSeparator,
+  ApiProvider,
 } from "@llamaindex/ui";
 import { Link } from "react-router-dom";
 import { Toaster } from "@llamaindex/ui";
 import { useToolbar, ToolbarProvider } from "@/lib/ToolbarContext";
-import "@/lib/client";
+import { clients } from "@/lib/client";
+import { AGENT_NAME } from "@/lib/config";
 
 // Import pages
 import HomePage from "./pages/HomePage";
@@ -19,18 +21,20 @@ import ItemPage from "./pages/ItemPage";
 export default function App() {
   return (
     <Theme>
-      <ToolbarProvider>
-        <div className="grid grid-rows-[auto_1fr] h-screen">
-          <Toolbar />
-          <main className="overflow-auto">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/item/:itemId" element={<ItemPage />} />
-            </Routes>
-          </main>
-        </div>
-        <Toaster />
-      </ToolbarProvider>
+      <ApiProvider clients={clients} deployment={AGENT_NAME}>
+        <ToolbarProvider>
+          <div className="grid grid-rows-[auto_1fr] h-screen">
+            <Toolbar />
+            <main className="overflow-auto">
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/item/:itemId" element={<ItemPage />} />
+              </Routes>
+            </main>
+          </div>
+          <Toaster />
+        </ToolbarProvider>
+      </ApiProvider>
     </Theme>
   );
 }

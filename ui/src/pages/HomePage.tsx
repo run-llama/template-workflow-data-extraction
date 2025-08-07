@@ -1,9 +1,15 @@
-import { ItemGrid, ItemCount } from "@llamaindex/ui";
+import {
+  ItemGrid,
+  ItemCount,
+  WorkflowTrigger,
+  WorkflowProgressBar,
+} from "@llamaindex/ui";
 import type { TypedAgentData } from "@llamaindex/cloud/beta/agent";
 import styles from "./HomePage.module.css";
 import { useNavigate } from "react-router-dom";
-import TriggerFileWorkflow from "@/components/workflow-trigger";
-import { data } from "@/lib/data";
+import { agentClient } from "@/lib/client";
+
+const deployment = import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME;
 
 export default function HomePage() {
   const lastMonth = new Date(
@@ -20,7 +26,7 @@ export default function HomePage() {
           <ItemCount
             title="Total Documents"
             filter={{ created_at: { gt: lastMonth } }}
-            client={data}
+            client={agentClient}
           />
           <ItemCount
             title="Reviewed"
@@ -28,7 +34,7 @@ export default function HomePage() {
               created_at: { gt: lastMonth },
               status: { eq: "approved" },
             }}
-            client={data}
+            client={agentClient}
           />
           <ItemCount
             title="Needs Review"
@@ -36,12 +42,21 @@ export default function HomePage() {
               created_at: { gt: lastMonth },
               status: { eq: "pending_review" },
             }}
-            client={data}
+            client={agentClient}
           />
         </div>
         <div className={styles.commandBar}>
-          <TriggerFileWorkflow />
+          <WorkflowTrigger
+            deployment={deployment}
+            workflow="process-file"
+            customWorkflowInput={(files) => {
+              return {
+                file_id: files[0].fileId,
+              };
+            }}
+          />
         </div>
+        <WorkflowProgressBar className={styles.progressBar} />
         <ItemGrid
           onRowClick={goToItem}
           builtInColumns={{
@@ -51,7 +66,7 @@ export default function HomePage() {
             itemsToReview: true,
             actions: true,
           }}
-          client={data}
+          client={agentClient}
         />
       </main>
     </div>
