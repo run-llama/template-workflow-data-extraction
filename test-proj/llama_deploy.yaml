@@ -9,8 +9,8 @@ services:
   process-file:
     name: Process File
     path: "src/test_proj.process_file:workflow"
-    env_files:
-    - .env
+    env-files:
+      - ".env"
 
 ui:
   name: "test-proj UI"

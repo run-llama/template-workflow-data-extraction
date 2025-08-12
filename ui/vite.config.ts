@@ -4,8 +4,8 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(({}) => {
-  const deploymentId = process.env.LLAMA_DEPLOY_NEXTJS_DEPLOYMENT_NAME;
-  const basePath = `/deployments/${deploymentId}/ui`;
+  const deploymentId = process.env.LLAMA_DEPLOY_DEPLOYMENT_URL_ID;
+  const basePath = process.env.LLAMA_DEPLOY_DEPLOYMENT_BASE_PATH;
   const projectId = process.env.LLAMA_DEPLOY_PROJECT_ID;
 
   return {
@@ -30,9 +30,9 @@ export default defineConfig(({}) => {
     define: {
       "import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME":
         JSON.stringify(deploymentId),
-      "import.meta.env.VITE_LLAMA_DEPLOY_BASE_PATH": JSON.stringify(basePath),
+      "import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_BASE_PATH": JSON.stringify(basePath),
       ...(projectId && {
-        "import.meta.env.VITE_LLAMA_CLOUD_PROJECT_ID":
+        "import.meta.env.VITE_LLAMA_DEPLOY_PROJECT_ID":
           JSON.stringify(projectId),
       }),
     },

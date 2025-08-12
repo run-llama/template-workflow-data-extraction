@@ -11,7 +11,7 @@ import { EXTRACTED_DATA_COLLECTION } from "./config";
 
 const platformToken = import.meta.env.VITE_LLAMA_CLOUD_API_KEY;
 const apiBaseUrl = import.meta.env.VITE_LLAMA_CLOUD_BASE_URL;
-const projectId = import.meta.env.VITE_LLAMA_CLOUD_PROJECT_ID;
+const projectId = import.meta.env.VITE_LLAMA_DEPLOY_PROJECT_ID;
 
 // Configure the platform client
 cloudApiClient.setConfig({
