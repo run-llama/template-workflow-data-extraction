@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   // injected from llama_deploy
   readonly VITE_LLAMA_DEPLOY_BASE_PATH: string;
   readonly VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME: string;
+  readonly VITE_LLAMA_DEPLOY_PROJECT_ID: string;
 }
 
 interface ImportMeta {
