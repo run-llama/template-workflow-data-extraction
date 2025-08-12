@@ -29,9 +29,9 @@ The backend python workflow and frontend ui share values from this single file.
 
 These apps are built on top of `llama_deploy`, which comes bundled with a `llamactl` cli for serving your workflows as an API, and your app, side by side.
 
-You can serve it locally with `uv run llamactl serve llama_deploy.local` from within this directory.
+You can serve it locally with `uvx llamactl serve` from within this directory.
 
-After starting with `llamactl`, visit `http://localhost:4501/deployments/{{package_name}}/ui` to see the UI.
+After starting with `llamactl`, visit `http://localhost:4501/deployments/{{ project_name }}/ui` to see the UI.
 
 ## Exporting types
 
