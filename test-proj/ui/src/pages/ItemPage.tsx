@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   AcceptReject,
   ExtractedDataDisplay,
   FilePreview,
+  JSONObject,
   useItemData,
+  type Highlight,
 } from "@llamaindex/ui";
 import { Clock, XCircle } from "lucide-react";
 import { useParams } from "react-router-dom";
@@ -18,9 +20,10 @@ import { APP_TITLE } from "@/lib/config";
 export default function ItemPage() {
   const { itemId } = useParams<{ itemId: string }>();
   const { setButtons, setBreadcrumbs } = useToolbar();
+  const [highlight, setHighlight] = useState<Highlight | undefined>(undefined);
 
   // Use the hook to fetch item data
-  const itemHookData = useItemData<MySchema>({
+  const itemHookData = useItemData<MySchema & JSONObject>({
     // order/remove fields as needed here
     jsonSchema: modifyJsonSchema(MyJsonSchema as any, {}),
     itemId: itemId as string,
@@ -65,7 +68,6 @@ export default function ItemPage() {
 
   const {
     item: itemData,
-    data,
     updateData,
     loading: isLoading,
     error,
@@ -105,6 +107,7 @@ export default function ItemPage() {
             onBoundingBoxClick={(box, pageNumber) => {
               console.log("Bounding box clicked:", box, "on page:", pageNumber);
             }}
+            highlight={highlight}
           />
         )}
       </div>
@@ -113,16 +116,21 @@ export default function ItemPage() {
       <div className="flex-1 bg-white h-full overflow-y-auto">
         <div className="p-4 space-y-4">
           {/* Extracted Data */}
-          <ExtractedDataDisplay
-            data={(data as Record<string, unknown>) || {}}
-            confidence={
-              {
-                /** TODO: add confidence and page citations */
-              }
-            }
+          <ExtractedDataDisplay<MySchema & JSONObject>
+            extractedData={itemData.data}
             title="Extracted Data"
             onChange={(updatedData) => {
               updateData(updatedData as any);
+            }}
+            onClickField={(args) => {
+              // TODO: set multiple highlights
+              setHighlight({
+                page: args.metadata?.citation?.[0]?.page ?? 1,
+                x: 100,
+                y: 100,
+                width: 0,
+                height: 0,
+              });
             }}
             jsonSchema={itemHookData.jsonSchema}
           />

@@ -1,6 +1,6 @@
 import { MySchema } from "@/schemas/MySchema";
-import { ExtractedData } from "@llamaindex/cloud/beta/agent";
-import { ApiClients } from "@llamaindex/ui";
+import { ExtractedData } from "llama-cloud-services/beta/agent";
+import { ApiClients, JSONObject } from "@llamaindex/ui";
 import {
   createCloudAgentClient,
   createLlamaDeployClient,
@@ -25,7 +25,9 @@ cloudApiClient.setConfig({
   },
 });
 
-const agentClient = createCloudAgentClient<ExtractedData<MySchema>>({
+const agentClient = createCloudAgentClient<
+  ExtractedData<MySchema & JSONObject>
+>({
   baseUrl: apiBaseUrl,
   apiKey: platformToken,
   windowUrl: typeof window !== "undefined" ? window.location.href : undefined,
