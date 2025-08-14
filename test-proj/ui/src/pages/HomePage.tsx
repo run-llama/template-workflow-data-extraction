@@ -1,10 +1,10 @@
 import {
-  ItemGrid,
   ItemCount,
   WorkflowTrigger,
   WorkflowProgressBar,
+  ExtractedDataItemGrid,
 } from "@llamaindex/ui";
-import type { TypedAgentData } from "@llamaindex/cloud/beta/agent";
+import type { TypedAgentData } from "llama-cloud-services/beta/agent";
 import styles from "./HomePage.module.css";
 import { useNavigate } from "react-router-dom";
 import { agentClient } from "@/lib/client";
@@ -24,7 +24,7 @@ export default function HomePage() {
       <main className={styles.main}>
         <div className={styles.grid}>
           <ItemCount
-            title="Total Documents"
+            title="Total Items"
             filter={{ created_at: { gt: lastMonth } }}
             client={agentClient}
           />
@@ -57,7 +57,7 @@ export default function HomePage() {
           />
         </div>
         <WorkflowProgressBar className={styles.progressBar} />
-        <ItemGrid
+        <ExtractedDataItemGrid
           onRowClick={goToItem}
           builtInColumns={{
             fileName: true,
@@ -66,7 +66,6 @@ export default function HomePage() {
             itemsToReview: true,
             actions: true,
           }}
-          client={agentClient}
         />
       </main>
     </div>
