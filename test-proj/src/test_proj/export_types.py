@@ -51,7 +51,6 @@ def generate_typescript_interfaces(schema_dir: Path):
     run_command(
         f"npx -y json-schema-to-typescript@15.0.4 -i '{schema_dir / '*.json'}' -o {schema_dir} --additionalProperties=false"
     )
-    run_command(f"npx -y prettier@3.5.1 --write {schema_dir}")
 
 
 def load_module_from_path(module_name: str, file_path: Path) -> ModuleType:
