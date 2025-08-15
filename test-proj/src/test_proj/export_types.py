@@ -17,7 +17,6 @@ from types import ModuleType
 import jsonref
 from pydantic import BaseModel
 import click
-import re
 
 
 def run_command(cmd: str):
