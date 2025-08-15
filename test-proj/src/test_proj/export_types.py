@@ -17,6 +17,7 @@ from types import ModuleType
 import jsonref
 from pydantic import BaseModel
 import click
+import re
 
 
 def run_command(cmd: str):
@@ -51,7 +52,41 @@ def generate_typescript_interfaces(schema_dir: Path):
     run_command(
         f"npx -y json-schema-to-typescript@15.0.4 -i '{schema_dir / '*.json'}' -o {schema_dir}"
     )
+    post_process_typescript_declarations(schema_dir)
     run_command(f"npx -y prettier@3.5.1 --write {schema_dir}")
+
+
+def post_process_typescript_declarations(schema_dir: Path) -> None:
+    """Replace index signature value type with JSONObject and insert import.
+
+    - Turns `[k: string]: unknown;` and `[k: string]: any;` into `[k: string]: JSONObject;`
+    - Adds `import type { JSONObject } from '@llamaindex/ui';` if needed
+    """
+    index_signature_unknown_pattern = re.compile(r"\[k:\s*string\]:\s*unknown;?")
+    index_signature_any_pattern = re.compile(r"\[k:\s*string\]:\s*any;?")
+    import_statement = "import type { JSONObject } from '@llamaindex/ui';\n"
+    import_regex = re.compile(r"import\s+type\s+\{\s*JSONObject\s*\}\s+from\s+'@llamaindex/ui';")
+
+    for dts_path in schema_dir.glob("*.d.ts"):
+        content = dts_path.read_text(encoding="utf-8")
+
+        # Replace index signature value types
+        new_content = index_signature_unknown_pattern.sub("[k: string]: JSONObject;", content)
+        new_content = index_signature_any_pattern.sub("[k: string]: JSONObject;", new_content)
+
+        # Insert import if JSONObject is used and import not present
+        if "JSONObject" in new_content and not import_regex.search(new_content):
+            # Try to place after the generator banner if present, else at file start
+            insertion_index = 0
+            banner_end = new_content.find("*/")
+            if banner_end != -1:
+                # Move to the next newline after banner
+                next_newline = new_content.find("\n", banner_end + 2)
+                insertion_index = next_newline + 1 if next_newline != -1 else banner_end + 2
+            new_content = new_content[:insertion_index] + import_statement + new_content[insertion_index:]
+
+        if new_content != content:
+            dts_path.write_text(new_content, encoding="utf-8")
 
 
 def load_module_from_path(module_name: str, file_path: Path) -> ModuleType:

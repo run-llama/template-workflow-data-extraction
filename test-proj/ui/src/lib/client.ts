@@ -26,7 +26,7 @@ cloudApiClient.setConfig({
 });
 
 const agentClient = createCloudAgentClient<
-  ExtractedData<MySchema & JSONObject>
+  ExtractedData<MySchema>
 >({
   baseUrl: apiBaseUrl,
   apiKey: platformToken,

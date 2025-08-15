@@ -3,7 +3,6 @@ import {
   AcceptReject,
   ExtractedDataDisplay,
   FilePreview,
-  JSONObject,
   useItemData,
   type Highlight,
 } from "@llamaindex/ui";
@@ -23,7 +22,7 @@ export default function ItemPage() {
   const [highlight, setHighlight] = useState<Highlight | undefined>(undefined);
 
   // Use the hook to fetch item data
-  const itemHookData = useItemData<MySchema & JSONObject>({
+  const itemHookData = useItemData<MySchema>({
     // order/remove fields as needed here
     jsonSchema: modifyJsonSchema(MyJsonSchema as any, {}),
     itemId: itemId as string,
@@ -116,7 +115,7 @@ export default function ItemPage() {
       <div className="flex-1 bg-white h-full overflow-y-auto">
         <div className="p-4 space-y-4">
           {/* Extracted Data */}
-          <ExtractedDataDisplay<MySchema & JSONObject>
+          <ExtractedDataDisplay<MySchema>
             extractedData={itemData.data}
             title="Extracted Data"
             onChange={(updatedData) => {
