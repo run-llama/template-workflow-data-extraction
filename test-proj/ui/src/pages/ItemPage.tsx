@@ -119,7 +119,7 @@ export default function ItemPage() {
             extractedData={itemData.data}
             title="Extracted Data"
             onChange={(updatedData) => {
-              updateData(updatedData);
+              updateData(updatedData as any);
             }}
             onClickField={(args) => {
               // TODO: set multiple highlights

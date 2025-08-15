@@ -1,6 +1,6 @@
 import { MySchema } from "@/schemas/MySchema";
 import { ExtractedData } from "llama-cloud-services/beta/agent";
-import { ApiClients, JSONObject } from "@llamaindex/ui";
+import { ApiClients } from "@llamaindex/ui";
 import {
   createCloudAgentClient,
   createLlamaDeployClient,
