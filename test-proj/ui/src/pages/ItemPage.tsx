@@ -54,7 +54,7 @@ export default function ItemPage() {
   useEffect(() => {
     setButtons(() => [
       <div className="ml-auto flex items-center">
-        <AcceptReject
+        <AcceptReject<MySchema>
           itemData={itemHookData}
           onComplete={() => navigate("/")}
         />
