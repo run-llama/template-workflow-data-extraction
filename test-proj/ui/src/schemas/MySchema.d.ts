@@ -9,5 +9,4 @@ export type Hello = string;
 
 export interface MySchema {
   hello: Hello;
-  [k: string]: unknown;
 }
