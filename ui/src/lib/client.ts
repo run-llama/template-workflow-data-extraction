@@ -15,7 +15,7 @@ const projectId = import.meta.env.VITE_LLAMA_DEPLOY_PROJECT_ID;
 
 // Configure the platform client
 cloudApiClient.setConfig({
-  baseUrl: apiBaseUrl,
+  ...(apiBaseUrl && { baseUrl: apiBaseUrl }),
   headers: {
     // optionally use a backend API token scoped to a project. For local development,
     ...(platformToken && { authorization: `Bearer ${platformToken}` }),
