@@ -1,58 +1,33 @@
 # Data Extraction and Ingestion
 
-This is a starter for a [`llama_deploy`](https://github.com/run-llama/llama_deploy) powered app.
+This is a starter for a [`llama_deploy`](https://github.com/run-llama/cloud_llama_deploy) powered app.
+See it's [getting started guide](https://github.com/run-llama/cloud_llama_deploy/tree/main/docs/guides/01-getting-started.md)
+for more info on how to run this project.
 
+The backend contains a single workflow that runs LlamaCloud Extraction, given your schema. The frontend exposes an
+extraction review UI, where you can review and correct extractions. 
 
-## Installation and Local Development
+## Customizing the schema.
 
-`uv` is used for python, and `pnpm` for JavaScript. They both use workspaces to link packages in this monorepo
+The starter contains a placeholder `MySchema` that is used for extraction. See [`schema.py`](./src/test-proj/schema.py). 
 
-### Python Setup
+You should customize this `schema.py` for your use case to modify the extracted data. You can also rename the schema from `MySchema` to 
+something more appropriate for your use case. Do a find and replace on "MySchema" to also fix the frontend references.
 
-First, [install `uv`](https://docs.astral.sh/uv/getting-started/installation/).
+The frontend has a copy of the schema as a json schema, that it uses to introspect and generate an editing UI. Run `uv run export-types` to regenerate the frontend json schema.
 
-To set up a virtual environment with `uv`, run `uv sync`. You can either activate this single virtual environment, or just `uv run <cmd>` to run `<cmd>` within `uv`s venv.
-`uv run` will roughly install the correct dependencies, and run it within the virtual environment. For example `uv run python my_workflow.py`
+## Customizing the application
 
-### JavaScript Setup
-
-To set up `pnpm` run `corepack enable` in the `/ui` directory. `corepack` is a "package manager package manager" that is normally installed alongside Node.js. This project is using node v22.
-
-Run `pnpm i` to install all dependencies.
-
-### Environments and `.env`
-
-There is a template `.env` file. Copy this file and edit its values: `cp .env.template .env` 
-The backend python workflow and frontend ui share values from this single file.
-
-### Serving locally with llamactl
-
-These apps are built on top of `llama_deploy`, which comes bundled with a `llamactl` cli for serving your workflows as an API, and your app, side by side.
-
-You can serve it locally with `uvx llamactl serve` from within this directory.
-
-After starting with `llamactl`, visit `http://localhost:4501/deployments/test-proj/ui` to see the UI.
-
-## Exporting types
-
-To generate typescript types for sharing with the UI from your `schema.py`, run `uv run export-types` from this directory. This will export json schemas and typescript
-types to the ui under `ui/src/schemas` for every pydantic model in `schemas.py`. The UI uses the schemas in order to structure its UI, so make sure to run this after
-you modify you pydantic schemas.
+This is meant to just be a starting place. You can add more workflows, and trigger them from the UI. For example, you could
+add functionality sync to a downstream data sink to export the corrected data after review. Or you could add a workflow
+that monitors a data source, and automatically triggers the extraction against the file.
 
 ### Running Workflows
 
 The core value of this template is good extraction. The main python code is in the `src` directory.
 
-Workflows can be triggered from the UI using `useWorkflow` react hooks. You can also add a `if __name__ == "__main__":` handler to individual 
-workflows to run and debug them directly. Eventually there will be support for auto-running workflows in the app.  The `process_file.py` has main
-handler that will upload a `test.pdf` from your current working directory so you can test your extraction directly.
+Workflows can be triggered from the UI using `useWorkflow` react hooks from the `@llamaindex/ui` library.
+You can also add a `if __name__ == "__main__":` handler to individual workflows to run and debug them directly.
+The `process_file.py` has main handler that will upload a `test.pdf` from your current working directory so you
+can test your extraction directly.
 
-### Workflow Files
-
-The template includes the following files that you may customize:
-
-- `process_file.py` - this is a workflow triggered for an individual file, triggered from the UI.
-- `config.py` - Environment and secret parsing, and basic client interface construction
-- `schemas.py` - Write pydantic schemas here. Don't add additional dependencies to this file. `builder` can read this file and autogenerate zod schemas for the ui
-- `.env` - Add environment variables here as needed for running locally, and parse them in the code
-- `pyproject.toml` - Uses `uv` standards. Add dependencies here with `uv add <dependency>` for example `uv add cv2`
