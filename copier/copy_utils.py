@@ -786,7 +786,7 @@ def check_python(fix: bool) -> None:
 
 
 def run_javascript_checks(test_proj_dir: Path, fix: bool) -> None:
-    """Run TypeScript and format validation checks on test-proj/ui using pnpm."""
+    """Run TypeScript and format validation checks on test-proj/ui using npm."""
     ui_dir: Path = test_proj_dir / "ui"
 
     # Check if ui directory exists
@@ -794,16 +794,16 @@ def run_javascript_checks(test_proj_dir: Path, fix: bool) -> None:
         console.print("Error: test-proj/ui directory does not exist.", style="bold red")
         sys.exit(1)
 
-    # Run TypeScript checks with pnpm
+    # Run TypeScript checks with npm
     console.print("Running TypeScript validation checks...")
-    run_git_command(["pnpm", "run", "all-fix" if fix else "all-check"], cwd=ui_dir)
+    run_git_command(["npm", "run", "all-fix" if fix else "all-check"], cwd=ui_dir)
     console.print("✓ TypeScript checks passed")
 
 
 @cli.command("check-javascript")
 @click.option("--fix", is_flag=True, help="Fix formatting issues automatically.")
 def check_javascript(fix: bool) -> None:
-    """Run TypeScript and format validation checks on test-proj/ui using pnpm."""
+    """Run TypeScript and format validation checks on test-proj/ui using npm."""
     script_dir: Path = get_script_dir_and_setup()
     test_proj_dir: Path = ensure_test_proj_exists(script_dir)
     run_javascript_checks(test_proj_dir, fix)

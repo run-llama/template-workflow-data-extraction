@@ -22,8 +22,8 @@ Make all your desired code changes directly within the `test-proj/` directory. T
 ```bash
 # Example: Work on the UI
 cd test-proj/ui
-pnpm install
-pnpm dev
+npm install
+npm dev
 ```
 
 Run validation checks to ensure your changes are correct before propagating them.
@@ -33,7 +33,7 @@ Run validation checks to ensure your changes are correct before propagating them
 ./copier/copy_utils.py check-python
 # or within test-proj/, run `uv run hatch run all` or the individual script commands, such as `uv run hatch run format`
 ./copier/copy_utils.py check-javascript
-# or within test-proj/ui/, run `pnpm run all`, or the individual script commands such as `pnpm run format`
+# or within test-proj/ui/, run `npm run all`, or the individual script commands such as `npm run format`
 ```
 
 ### 3. Commit Your Development Work
