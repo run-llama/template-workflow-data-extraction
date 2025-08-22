@@ -1,18 +1,6 @@
-name: "test-proj"
-
-control-plane:
-  port: 8000
-
-default-service: process-file
-
-services:
-  process-file:
-    name: Process File
-    path: "src/test_proj.process_file:workflow"
-    env-files:
-      - ".env"
-
+env_files:
+  - ".env"
+workflows:
+  process-file: "test_proj.process_file:workflow"
 ui:
-  name: "test-proj UI"
-  source:
-    name: ./ui
+  directory: ui
