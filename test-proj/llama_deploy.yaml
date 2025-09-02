@@ -1,5 +1,6 @@
 env_files:
   - ".env"
+llama_cloud: true
 workflows:
   process-file: "test_proj.process_file:workflow"
 ui:
