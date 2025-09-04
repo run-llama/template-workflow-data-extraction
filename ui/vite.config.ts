@@ -8,6 +8,7 @@ export default defineConfig(({}) => {
   const basePath = process.env.LLAMA_DEPLOY_DEPLOYMENT_BASE_PATH;
   const projectId = process.env.LLAMA_DEPLOY_PROJECT_ID;
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+  const baseUrl = process.env.LLAMA_CLOUD_BASE_URL;
   return {
     plugins: [react()],
     resolve: {
@@ -31,6 +32,9 @@ export default defineConfig(({}) => {
       ...(projectId && {
         "import.meta.env.VITE_LLAMA_DEPLOY_PROJECT_ID":
           JSON.stringify(projectId),
+      }),
+      ...(baseUrl && {
+        "import.meta.env.VITE_LLAMA_CLOUD_BASE_URL": JSON.stringify(baseUrl),
       }),
     },
   };
