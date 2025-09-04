@@ -15,14 +15,13 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import os
 import difflib
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import click
 import yaml
@@ -112,139 +111,7 @@ def parse_template_variables() -> Dict[str, str]:
     return result
 
 
-def find_simple_jinja_patterns(template_line: str) -> List[Tuple[str, str]]:
-    """Find simple jinja variable patterns in a template line.
-
-    Returns list of (pattern, variable_name) tuples.
-    """
-    patterns = []
-
-    # Find {{variable}} patterns
-    variable_pattern = r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}"
-    for match in re.finditer(variable_pattern, template_line):
-        patterns.append((match.group(0), match.group(1)))
-
-    # Find {{variable.method()}} patterns (simple transforms)
-    transform_pattern = r'\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_().\-\'" ]+)\s*\}\}'
-    for match in re.finditer(transform_pattern, template_line):
-        patterns.append((match.group(0), match.group(1)))
-
-    return patterns
-
-
-def evaluate_jinja_expression(
-    expression: str, variables: Dict[str, str]
-) -> Optional[str]:
-    """Safely evaluate simple jinja expressions."""
-    try:
-        # Handle simple variable references
-        if expression in variables:
-            return variables[expression]
-
-        # Handle simple method calls on variables
-        if "." in expression:
-            var_name = expression.split(".")[0]
-            if var_name in variables:
-                value = variables[var_name]
-
-                # Handle common string methods
-                if ".replace('-', '_')" in expression:
-                    return value.replace("-", "_")
-                elif ".replace('-', ' ').title()" in expression:
-                    return value.replace("-", " ").title()
-                elif ".replace('_', '-')" in expression:
-                    return value.replace("_", "-")
-
-        return None
-    except Exception:
-        return None
-
-
-def attempt_simple_line_resolution(
-    template_line: str, expected_line: str, actual_line: str, variables: Dict[str, str]
-) -> Optional[str]:
-    """Try to resolve a single line difference by updating jinja template.
-
-    Returns updated template line if successful, None if too complex.
-    """
-    # Skip if template line has no jinja patterns
-    jinja_patterns = find_simple_jinja_patterns(template_line)
-    if not jinja_patterns:
-        return None
-
-    # Skip complex jinja (conditionals, loops, etc.)
-    if "{%" in template_line or "{#" in template_line:
-        return None
-
-    # Simple approach: for lines with variables, update the literal parts
-    # Validation will ensure this actually works
-    if len(jinja_patterns) == 1:
-        pattern, var_name = jinja_patterns[0]
-        var_value = variables.get(var_name, "")
-
-        # If both lines contain the variable value, update surrounding text
-        if var_value and var_value in expected_line and var_value in actual_line:
-            expected_parts = expected_line.split(var_value)
-            actual_parts = actual_line.split(var_value)
-
-            if len(expected_parts) == 2 and len(actual_parts) == 2:
-                # Replace literal text around the variable
-                actual_prefix, actual_suffix = actual_parts
-                result = f"{actual_prefix}{pattern}{actual_suffix}"
-                return result
-
-    return None
-
-
-def attempt_jinja_auto_resolution(
-    template_file: Path, expected_content: str, actual_content: str, variables: Dict[str, str]
-) -> Optional[str]:
-    """Try to automatically resolve jinja template differences.
-
-    Returns updated template content if successful, None if too complex.
-    """
-    if not template_file.exists():
-        return None
-
-    with open(template_file, "r", encoding="utf-8") as f:
-        template_content = f.read()
-
-    template_lines = template_content.splitlines()
-    expected_lines = expected_content.splitlines()
-    actual_lines = actual_content.splitlines()
-
-    # Track changes made
-    changes_made = False
-    new_template_lines = template_lines.copy()
-
-    # Compare line by line
-    max_lines = max(len(expected_lines), len(actual_lines), len(template_lines))
-
-    for i in range(max_lines):
-        expected_line = expected_lines[i] if i < len(expected_lines) else ""
-        actual_line = actual_lines[i] if i < len(actual_lines) else ""
-        template_line = template_lines[i] if i < len(template_lines) else ""
-
-        if expected_line != actual_line and template_line:
-            resolved_line = attempt_simple_line_resolution(
-                template_line, expected_line, actual_line, variables
-            )
-
-            if resolved_line:
-                new_template_lines[i] = resolved_line
-                changes_made = True
-
-    if changes_made:
-        proposed_content = "\n".join(new_template_lines)
-
-        # Validate the proposed fix before accepting it
-        script_dir = Path(__file__).parent.parent
-        if validate_auto_resolved_template(
-            script_dir, template_file, proposed_content, actual_content
-        ):
-            return proposed_content
-
-    return None
+## Removed simple line-based resolver in favor of chunk-based approach
 
 
 def _line_has_jinja_markers(line: str) -> bool:
@@ -260,7 +127,9 @@ def _build_expected_to_template_index_map(
     Uses difflib to align the current template with its rendered expected output.
     The map records, for each expected index, a nearby template index anchor.
     """
-    matcher = difflib.SequenceMatcher(None, template_lines, expected_lines, autojunk=False)
+    matcher = difflib.SequenceMatcher(
+        None, template_lines, expected_lines, autojunk=False
+    )
     mapping: Dict[int, int] = {}
 
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
@@ -308,7 +177,9 @@ def attempt_chunk_based_jinja_resolution(
     exp_to_tpl = _build_expected_to_template_index_map(template_lines, expected_lines)
 
     # Compute hunks between expected and actual
-    matcher = difflib.SequenceMatcher(None, expected_lines, actual_lines, autojunk=False)
+    matcher = difflib.SequenceMatcher(
+        None, expected_lines, actual_lines, autojunk=False
+    )
 
     # Work on a mutable copy of template lines
     new_template_lines = list(template_lines)
@@ -345,7 +216,10 @@ def attempt_chunk_based_jinja_resolution(
             # Only insert when the immediate context is free of Jinja markers
             left_ctx = max(0, tpl_start - 1)
             right_ctx = min(len(new_template_lines), tpl_start + 1)
-            if any(_line_has_jinja_markers(new_template_lines[t]) for t in range(left_ctx, right_ctx)):
+            if any(
+                _line_has_jinja_markers(new_template_lines[t])
+                for t in range(left_ctx, right_ctx)
+            ):
                 continue
             new_template_lines[tpl_start:tpl_start] = insert_lines
             delta_offset += len(insert_lines)
@@ -370,6 +244,13 @@ def attempt_chunk_based_jinja_resolution(
 
     proposed_content = "\n".join(new_template_lines)
 
+    # Preserve trailing newline behavior to match actual materialized content
+    actual_has_trailing_newline = actual_content.endswith("\n")
+    if actual_has_trailing_newline and not proposed_content.endswith("\n"):
+        proposed_content += "\n"
+    elif not actual_has_trailing_newline and proposed_content.endswith("\n"):
+        proposed_content = proposed_content[:-1]
+
     # Validate the proposed content produces the actual content
     script_dir = Path(__file__).parent.parent
     if validate_auto_resolved_template(
@@ -378,6 +259,7 @@ def attempt_chunk_based_jinja_resolution(
         return proposed_content
 
     return None
+
 
 def validate_auto_resolved_template(
     script_dir: Path,
@@ -541,6 +423,17 @@ def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
         with open(actual_file, "r", encoding="utf-8") as f:
             actual_content = f.read()
 
+        # Normalize trailing newline-only differences for comparison
+        def _normalize_newline_end(s: str) -> str:
+            if s.endswith("\n"):
+                return s
+            return s + "\n"
+
+        if _normalize_newline_end(expected_content) == _normalize_newline_end(
+            actual_content
+        ):
+            continue
+
         if expected_content != actual_content:
             differences.append(f"Content differs: {file_path}")
 
@@ -584,9 +477,6 @@ def compare_with_expected_materialized(
 
             files_to_copy = []
             files_needing_manual_fix = []
-            
-            # Parse template variables once for auto-resolution
-            variables = parse_template_variables()
 
             # For files that differ in content, show detailed diff and categorize
             console.print("\nDetailed differences:")
@@ -645,15 +535,11 @@ def compare_with_expected_materialized(
                         # Try auto-resolution first
                         auto_resolved_content = None
                         if expected_content and actual_content:
-                            # First pass: simple line-based resolver
-                            auto_resolved_content = attempt_jinja_auto_resolution(
-                                template_file, expected_content, actual_content, variables
-                            )
-                            # Fallback: general chunk-based resolver
-                            if not auto_resolved_content:
-                                auto_resolved_content = attempt_chunk_based_jinja_resolution(
+                            auto_resolved_content = (
+                                attempt_chunk_based_jinja_resolution(
                                     template_file, expected_content, actual_content
                                 )
+                            )
 
                         if auto_resolved_content:
                             # Accept the auto-resolution (our logic is conservative enough)
@@ -799,10 +685,10 @@ def cli() -> None:
 def regenerate_test_proj(script_dir: Path) -> None:
     """Regenerate the test-proj directory using copier."""
     test_proj_dir: Path = script_dir / "test-proj"
-    
+
     # Parse template variables before deleting the directory
     variables = parse_template_variables() if test_proj_dir.exists() else {}
-    
+
     # Delete the test-proj directory if it exists
     if test_proj_dir.exists():
         console.print(f"Deleting {test_proj_dir}")
@@ -817,7 +703,7 @@ def regenerate_test_proj(script_dir: Path) -> None:
             str(test_proj_dir),
             variables,
         )
-    
+
     # Revert the .copier-answers.yml file since it gets updated with new revision info
     answers_file = test_proj_dir / ".copier-answers.yml"
     if answers_file.exists():
