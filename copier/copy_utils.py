@@ -14,6 +14,7 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import os
+import difflib
 import re
 import shutil
 import subprocess
@@ -26,7 +27,6 @@ from typing import Dict, List, Optional, Tuple
 import click
 import yaml
 from rich.console import Console
-from rich.spinner import Spinner
 
 import copier
 from copier._template import Template
@@ -99,7 +99,7 @@ def parse_template_variables() -> Dict[str, str]:
                         )
                         result[question_name] = rendered
                         changed = True
-                    except Exception as e:
+                    except Exception:
                         # Skip variables that can't be evaluated yet
                         pass
                 else:
@@ -246,6 +246,138 @@ def attempt_jinja_auto_resolution(
 
     return None
 
+
+def _line_has_jinja_markers(line: str) -> bool:
+    """Return True if the line appears to contain Jinja syntax."""
+    return ("{{" in line) or ("{%" in line) or ("{#" in line)
+
+
+def _build_expected_to_template_index_map(
+    template_lines: List[str], expected_lines: List[str]
+) -> Dict[int, int]:
+    """Build a best-effort map from expected line index to template line index.
+
+    Uses difflib to align the current template with its rendered expected output.
+    The map records, for each expected index, a nearby template index anchor.
+    """
+    matcher = difflib.SequenceMatcher(None, template_lines, expected_lines, autojunk=False)
+    mapping: Dict[int, int] = {}
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            # Direct 1:1 alignment for equal blocks
+            span = min(i2 - i1, j2 - j1)
+            for k in range(span):
+                mapping[j1 + k] = i1 + k
+        else:
+            # For changed regions, map expected indices to the closest template index boundary
+            # Use i1 as the anchor template position for the whole expected block [j1, j2)
+            for j in range(j1, j2):
+                mapping.setdefault(j, i1)
+
+    # Also provide a fallback mapping for indexes beyond the last aligned block
+    if expected_lines:
+        last_expected_index = len(expected_lines)
+        last_template_index = len(template_lines)
+        mapping.setdefault(last_expected_index, last_template_index)
+
+    return mapping
+
+
+def attempt_chunk_based_jinja_resolution(
+    template_file: Path, expected_content: str, actual_content: str
+) -> Optional[str]:
+    """Attempt a general chunk-based resolution using difflib hunks.
+
+    - Compute opcodes between expected and actual (materialized) contents
+    - Map expected indexes to template indexes via a separate template↔expected alignment
+    - Apply inserts/deletes/replaces to the template cautiously, skipping regions that contain Jinja markers
+    - Validate by regenerating and comparing
+    """
+    if not template_file.exists():
+        return None
+
+    with open(template_file, "r", encoding="utf-8") as f:
+        template_content = f.read()
+
+    template_lines = template_content.splitlines()
+    expected_lines = expected_content.splitlines()
+    actual_lines = actual_content.splitlines()
+
+    # Map expected indexes to template indexes using alignment between template and expected
+    exp_to_tpl = _build_expected_to_template_index_map(template_lines, expected_lines)
+
+    # Compute hunks between expected and actual
+    matcher = difflib.SequenceMatcher(None, expected_lines, actual_lines, autojunk=False)
+
+    # Work on a mutable copy of template lines
+    new_template_lines = list(template_lines)
+    delta_offset = 0  # track shifts due to prior insertions/deletions in template list
+
+    def tpl_index_from_expected(exp_index: int) -> int:
+        # Return closest known template index; default to end if missing
+        return exp_to_tpl.get(exp_index, len(new_template_lines)) + delta_offset
+
+    def safe_region_has_jinja(t_start: int, t_end: int) -> bool:
+        # Check any Jinja markers in the region that would be modified
+        for t in range(max(0, t_start), min(len(new_template_lines), t_end)):
+            if _line_has_jinja_markers(new_template_lines[t]):
+                return True
+        return False
+
+    changes_made = False
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+
+        tpl_start = tpl_index_from_expected(i1)
+        tpl_end = tpl_index_from_expected(i2)
+
+        # Guard: if the region touches Jinja markers, skip this hunk entirely
+        # For inserts, check only the insertion point's immediate neighbors
+        if tag in ("replace", "delete"):
+            if safe_region_has_jinja(tpl_start, tpl_end):
+                continue
+
+        if tag == "insert":
+            insert_lines = actual_lines[j1:j2]
+            # Only insert when the immediate context is free of Jinja markers
+            left_ctx = max(0, tpl_start - 1)
+            right_ctx = min(len(new_template_lines), tpl_start + 1)
+            if any(_line_has_jinja_markers(new_template_lines[t]) for t in range(left_ctx, right_ctx)):
+                continue
+            new_template_lines[tpl_start:tpl_start] = insert_lines
+            delta_offset += len(insert_lines)
+            changes_made = True
+        elif tag == "delete":
+            # Delete corresponding template region
+            del_count = max(0, tpl_end - tpl_start)
+            if del_count > 0:
+                del new_template_lines[tpl_start:tpl_end]
+                delta_offset -= del_count
+                changes_made = True
+        elif tag == "replace":
+            replacement_lines = actual_lines[j1:j2]
+            del_count = max(0, tpl_end - tpl_start)
+            # Replace the region
+            new_template_lines[tpl_start:tpl_end] = replacement_lines
+            delta_offset += len(replacement_lines) - del_count
+            changes_made = True
+
+    if not changes_made:
+        return None
+
+    proposed_content = "\n".join(new_template_lines)
+
+    # Validate the proposed content produces the actual content
+    script_dir = Path(__file__).parent.parent
+    if validate_auto_resolved_template(
+        script_dir, template_file, proposed_content, actual_content
+    ):
+        return proposed_content
+
+    return None
 
 def validate_auto_resolved_template(
     script_dir: Path,
@@ -513,9 +645,15 @@ def compare_with_expected_materialized(
                         # Try auto-resolution first
                         auto_resolved_content = None
                         if expected_content and actual_content:
+                            # First pass: simple line-based resolver
                             auto_resolved_content = attempt_jinja_auto_resolution(
                                 template_file, expected_content, actual_content, variables
                             )
+                            # Fallback: general chunk-based resolver
+                            if not auto_resolved_content:
+                                auto_resolved_content = attempt_chunk_based_jinja_resolution(
+                                    template_file, expected_content, actual_content
+                                )
 
                         if auto_resolved_content:
                             # Accept the auto-resolution (our logic is conservative enough)
