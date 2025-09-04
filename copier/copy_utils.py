@@ -492,7 +492,7 @@ def compare_with_expected_materialized(
                     )
                     template_file = script_dir / template_file_path
 
-                    # Read file contents for auto-resolution
+                    # Read file contents for auto-resolution.
                     try:
                         with open(expected_file, "r", encoding="utf-8") as f:
                             expected_content = f.read()
