@@ -244,12 +244,9 @@ def attempt_chunk_based_jinja_resolution(
 
     proposed_content = "\n".join(new_template_lines)
 
-    # Preserve trailing newline behavior to match actual materialized content
-    actual_has_trailing_newline = actual_content.endswith("\n")
-    if actual_has_trailing_newline and not proposed_content.endswith("\n"):
+    # Ensure a single trailing newline for stability across environments
+    if not proposed_content.endswith("\n"):
         proposed_content += "\n"
-    elif not actual_has_trailing_newline and proposed_content.endswith("\n"):
-        proposed_content = proposed_content[:-1]
 
     # Validate the proposed content produces the actual content
     script_dir = Path(__file__).parent.parent
@@ -423,15 +420,11 @@ def compare_directories(expected_dir: Path, actual_dir: Path) -> List[str]:
         with open(actual_file, "r", encoding="utf-8") as f:
             actual_content = f.read()
 
-        # Normalize trailing newline-only differences for comparison
+        # Normalize trailing newline-only differences for comparison (force single newline)
         def _normalize_newline_end(s: str) -> str:
-            if s.endswith("\n"):
-                return s
-            return s + "\n"
+            return s.rstrip("\n") + "\n"
 
-        if _normalize_newline_end(expected_content) == _normalize_newline_end(
-            actual_content
-        ):
+        if _normalize_newline_end(expected_content) == _normalize_newline_end(actual_content):
             continue
 
         if expected_content != actual_content:
