@@ -55,8 +55,15 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '24'
-    
+
+    - name: Enable Corepack
+      run: corepack enable
+
+    - name: Activate pnpm version
+      working-directory: test-proj/ui
+      run: corepack prepare --activate
+
       
     - name: Run UI checks
-      run: npm run all-check
+      run: pnpm run all-check
       working-directory: test-proj/ui 

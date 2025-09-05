@@ -194,6 +194,9 @@ class ProcessFileWorkflow(Workflow):
 workflow = ProcessFileWorkflow(timeout=None)
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv()
     logging.basicConfig(level=logging.INFO)
 
     async def main():
