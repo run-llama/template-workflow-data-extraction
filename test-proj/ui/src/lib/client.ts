@@ -26,8 +26,7 @@ cloudApiClient.setConfig({
 });
 
 const agentClient = createCloudAgentClient<ExtractedData<MySchema>>({
-  baseUrl: apiBaseUrl,
-  apiKey: platformToken,
+  client: cloudApiClient,
   windowUrl: typeof window !== "undefined" ? window.location.href : undefined,
   collection: EXTRACTED_DATA_COLLECTION,
 });
