@@ -29,5 +29,5 @@ The core value of this template is good extraction. The main python code is in t
 Workflows can be triggered from the UI using `useWorkflow` react hooks from the `@llamaindex/ui` library.
 You can also add a `if __name__ == "__main__":` handler to individual workflows to run and debug them directly.
 The `process_file.py` has main handler that will upload a `test.pdf` from your current working directory so you
-can test your extraction directly.
-
+can test your extraction directly. Note, while `llamactl serve` will inject your LlamaCloud API key, you will need
+to set a `LLAMA_CLOUD_API_KEY` in your `.env` file or set an env var to run the `__main__` handler directly.
