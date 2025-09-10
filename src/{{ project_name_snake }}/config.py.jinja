@@ -69,5 +69,7 @@ def get_llama_cloud_client():
     return AsyncLlamaCloud(
         base_url=base_url,
         token=api_key,
-        httpx_client=httpx.AsyncClient(timeout=60, headers={"Project-Id": project_id}),
+        httpx_client=httpx.AsyncClient(
+            timeout=60, headers={"Project-Id": project_id} if project_id else None
+        ),
     )
