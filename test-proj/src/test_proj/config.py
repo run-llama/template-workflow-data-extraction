@@ -1,5 +1,6 @@
 import functools
 import os
+import httpx
 
 import dotenv
 from llama_cloud_services import ExtractionAgent, LlamaExtract
@@ -22,11 +23,14 @@ api_key = os.environ["LLAMA_CLOUD_API_KEY"]
 # get this in case running against a different environment than production
 base_url = os.getenv("LLAMA_CLOUD_BASE_URL")
 extracted_data_collection = "test-proj"
+project_id = os.getenv("LLAMA_DEPLOY_PROJECT_ID")
 
 
 @functools.lru_cache(maxsize=None)
 def get_extract_agent() -> ExtractionAgent:
-    extract_api = LlamaExtract(api_key=api_key, base_url=base_url)
+    extract_api = LlamaExtract(
+        api_key=api_key, base_url=base_url, project_id=project_id
+    )
     config = ExtractConfig(
         extraction_mode=ExtractMode.PREMIUM,
         system_prompt=None,
@@ -52,12 +56,11 @@ def get_extract_agent() -> ExtractionAgent:
 @functools.lru_cache(maxsize=None)
 def get_data_client() -> AsyncAgentDataClient:
     return AsyncAgentDataClient(
-        base_url=base_url,
-        token=api_key,
         agent_url_id=agent_name,
         collection=extracted_data_collection,
         # update MySchema for your schema, but retain the ExtractedData container
         type=ExtractedData[MySchema],
+        client=get_llama_cloud_client(),
     )
 
 
@@ -66,4 +69,5 @@ def get_llama_cloud_client():
     return AsyncLlamaCloud(
         base_url=base_url,
         token=api_key,
+        httpx_client=httpx.AsyncClient(timeout=60, headers={"Project-Id": project_id}),
     )
