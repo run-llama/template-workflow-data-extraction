@@ -48,16 +48,16 @@ function TaskList() {
           <ItemCount title="Total Items" client={agentClient} />
           <ItemCount
             title="Reviewed"
-            filter={{
+            filter={% raw %}{{
               status: { eq: "approved" },
-            }}
+            }}{% endraw %}
             client={agentClient}
           />
           <ItemCount
             title="Needs Review"
-            filter={{
+            filter={% raw %}{{
               status: { eq: "pending_review" },
-            }}
+            }}{% endraw %}
             client={agentClient}
           />
         </div>
@@ -66,7 +66,11 @@ function TaskList() {
             workflowName="process-file"
             customWorkflowInput={(files) => {
               return {
-                file_id: files[0].fileId,
+                __is_pydantic: true,
+                value: {
+                  file_id: files[0].fileId,
+                },
+                qualified_name: "{{ project_name_snake }}.process_file.FileEvent",
               };
             }}
           />
@@ -74,13 +78,13 @@ function TaskList() {
         <WorkflowProgressBar className={styles.progressBar} />
         <ExtractedDataItemGrid
           onRowClick={goToItem}
-          builtInColumns={{
+          builtInColumns={% raw %}{{
             fileName: true,
             status: true,
             createdAt: true,
             itemsToReview: true,
             actions: true,
-          }}
+          }}{% endraw %}
         />
       </main>
     </div>

@@ -66,7 +66,11 @@ function TaskList() {
             workflowName="process-file"
             customWorkflowInput={(files) => {
               return {
-                file_id: files[0].fileId,
+                __is_pydantic: true,
+                value: {
+                  file_id: files[0].fileId,
+                },
+                qualified_name: "test_proj.process_file.FileEvent",
               };
             }}
           />
