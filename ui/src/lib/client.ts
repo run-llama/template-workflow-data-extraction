@@ -1,9 +1,8 @@
 import { MySchema } from "@/schemas/MySchema";
 import { ExtractedData } from "llama-cloud-services/beta/agent";
-import { ApiClients, createLlamaDeployConfig } from "@llamaindex/ui";
+import { ApiClients, createWorkflowClient, createWorkflowConfig } from "@llamaindex/ui";
 import {
   createCloudAgentClient,
-  createLlamaDeployClient,
   cloudApiClient,
 } from "@llamaindex/ui";
 import { AGENT_NAME, EXTRACTED_DATA_COLLECTION } from "./config";
@@ -30,7 +29,7 @@ const agentClient = createCloudAgentClient<ExtractedData<MySchema>>({
   collection: EXTRACTED_DATA_COLLECTION,
 });
 
-const workflowsClient = createLlamaDeployClient(createLlamaDeployConfig({
+const workflowsClient = createWorkflowClient(createWorkflowConfig({
   baseUrl: `/deployments/${AGENT_NAME}/`,
 }));
 
