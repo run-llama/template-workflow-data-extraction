@@ -63,8 +63,7 @@ function TaskList() {
         </div>
         <div className={styles.commandBar}>
           <WorkflowTrigger
-            deployment={deployment}
-            workflow="process-file"
+            workflowName="process-file"
             customWorkflowInput={(files) => {
               return {
                 file_id: files[0].fileId,

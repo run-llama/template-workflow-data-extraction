@@ -12,7 +12,6 @@ import { Link } from "react-router-dom";
 import { Toaster } from "@llamaindex/ui";
 import { useToolbar, ToolbarProvider } from "@/lib/ToolbarContext";
 import { clients } from "@/lib/client";
-import { AGENT_NAME } from "@/lib/config";
 
 // Import pages
 import HomePage from "./pages/HomePage";
@@ -21,7 +20,7 @@ import ItemPage from "./pages/ItemPage";
 export default function App() {
   return (
     <Theme>
-      <ApiProvider clients={clients} deployment={AGENT_NAME}>
+      <ApiProvider clients={clients}>
         <ToolbarProvider>
           <div className="grid grid-rows-[auto_1fr] h-screen">
             <Toolbar />
