@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "llama-cloud-services>=0.6.59",
-    "llama-index-workflows>=2.0.0,<3.0.0",
+    "llama-index-workflows>=2.2.0,<3.0.0",
     "python-dotenv>=1.1.0",
     "jsonref>=1.1.0",
     "click>=8.2.1",
@@ -24,7 +24,7 @@ dev = [
     "ty>=0.0.1a16",
     "pytest>=8.4.1",
     "hatch>=1.14.1",
-    "llamactl>=0.3.0a23"
+    "llamactl>=0.3.0"
 ]
 
 [build-system]

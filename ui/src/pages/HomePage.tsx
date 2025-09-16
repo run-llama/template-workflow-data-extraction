@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { agentClient } from "@/lib/client";
 import { useEffect, useState } from "react";
 
+const deployment = import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME;
+
 export default function HomePage() {
   const { taskKey } = taskCompletedState();
   return <TaskList key={taskKey} />;
@@ -61,7 +63,8 @@ function TaskList() {
         </div>
         <div className={styles.commandBar}>
           <WorkflowTrigger
-            workflowName="process-file"
+            deployment={deployment}
+            workflow="process-file"
             customWorkflowInput={(files) => {
               return {
                 file_id: files[0].fileId,
