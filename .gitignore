@@ -8,3 +8,4 @@ test-proj/ui/pnpm-lock.yaml
 ui/pnpm-lock.yaml
 ui/package-lock.json
 test-proj/ui/package-lock.json
+workflows.db
