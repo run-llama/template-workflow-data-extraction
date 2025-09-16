@@ -1,10 +1,11 @@
 import { MySchema } from "@/schemas/MySchema";
 import { ExtractedData } from "llama-cloud-services/beta/agent";
-import { ApiClients, createWorkflowClient, createWorkflowConfig } from "@llamaindex/ui";
 import {
-  createCloudAgentClient,
-  cloudApiClient,
+  ApiClients,
+  createWorkflowClient,
+  createWorkflowConfig,
 } from "@llamaindex/ui";
+import { createCloudAgentClient, cloudApiClient } from "@llamaindex/ui";
 import { AGENT_NAME, EXTRACTED_DATA_COLLECTION } from "./config";
 
 const platformToken = import.meta.env.VITE_LLAMA_CLOUD_API_KEY;
@@ -29,9 +30,11 @@ const agentClient = createCloudAgentClient<ExtractedData<MySchema>>({
   collection: EXTRACTED_DATA_COLLECTION,
 });
 
-const workflowsClient = createWorkflowClient(createWorkflowConfig({
-  baseUrl: `/deployments/${AGENT_NAME}/`,
-}));
+const workflowsClient = createWorkflowClient(
+  createWorkflowConfig({
+    baseUrl: `/deployments/${AGENT_NAME}/`,
+  }),
+);
 
 const clients: ApiClients = {
   workflowsClient: workflowsClient,
