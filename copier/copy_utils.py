@@ -44,6 +44,7 @@ def run_copier_quietly(src_path: str, dst_path: str, data: Dict[str, str]) -> No
         data=data,
         unsafe=True,
         quiet=True,
+        vcs_ref="HEAD",
     )
 
 
