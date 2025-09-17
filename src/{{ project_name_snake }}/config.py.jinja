@@ -56,7 +56,7 @@ def get_extract_agent() -> ExtractionAgent:
 @functools.lru_cache(maxsize=None)
 def get_data_client() -> AsyncAgentDataClient:
     return AsyncAgentDataClient(
-        agent_url_id=agent_name,
+        deployment_name=agent_name,
         collection=extracted_data_collection,
         # update MySchema for your schema, but retain the ExtractedData container
         type=ExtractedData[MySchema],
