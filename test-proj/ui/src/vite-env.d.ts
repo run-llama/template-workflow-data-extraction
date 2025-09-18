@@ -7,8 +7,6 @@ interface ImportMetaEnv {
   // injected from llama_deploy
   readonly VITE_LLAMA_DEPLOY_BASE_PATH: string;
   readonly VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME: string;
-  // deprecated; kept for backwards compat
-  readonly VITE_LLAMA_DEPLOY_DEPLOYMENT_URL_ID?: string;
   readonly VITE_LLAMA_DEPLOY_PROJECT_ID: string;
 }
 

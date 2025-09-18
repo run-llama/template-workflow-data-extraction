@@ -37,10 +37,6 @@ export default defineConfig(({}) => {
       "import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME": JSON.stringify(
         deploymentName
       ),
-      // Keep deprecated URL_ID define for downstream consumers that still reference it
-      "import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_URL_ID": JSON.stringify(
-        process.env.LLAMA_DEPLOY_DEPLOYMENT_URL_ID || deploymentName
-      ),
       "import.meta.env.VITE_LLAMA_DEPLOY_DEPLOYMENT_BASE_PATH": JSON.stringify(basePath),
       ...(projectId && {
         "import.meta.env.VITE_LLAMA_DEPLOY_PROJECT_ID":
