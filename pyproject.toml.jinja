@@ -9,7 +9,7 @@ dependencies = [
     "llama-index-workflows>=2.2.0,<3.0.0",
     "python-dotenv>=1.1.0",
     "jsonref>=1.1.0",
-    "click>=8.2.1",
+    "click>=8.2.1,<8.3.0",
     "httpx>=0.28.1",
     "llama-index-core>=0.14.0",
 ]
@@ -40,3 +40,14 @@ typecheck = "ty check src"
 test = "pytest"
 "all-check" = ["format-check", "lint-check", "test"]
 "all-fix" = ["format", "lint", "test"]
+
+[tool.llamadeploy]
+env_files = [".env"]
+llama_cloud = true
+
+[tool.llamadeploy.workflows]
+process-file = "{{project_name_snake}}.process_file:workflow"
+
+[tool.llamadeploy.ui]
+directory = "ui"
+
