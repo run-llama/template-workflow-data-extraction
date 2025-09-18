@@ -40,3 +40,14 @@ typecheck = "ty check src"
 test = "pytest"
 "all-check" = ["format-check", "lint-check", "test"]
 "all-fix" = ["format", "lint", "test"]
+
+[tool.llamadeploy]
+env_files = [".env"]
+llama_cloud = true
+
+[tool.llamadeploy.workflows]
+process-file = "test_proj.process_file:workflow"
+
+[tool.llamadeploy.ui]
+directory = "ui"
+
