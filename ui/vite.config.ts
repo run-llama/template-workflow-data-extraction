@@ -4,14 +4,7 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(({}) => {
-  // Prefer the new NAME env; fall back to deprecated URL_ID for backwards compat
-  const deploymentName =
-    process.env.LLAMA_DEPLOY_DEPLOYMENT_NAME ||
-    process.env.LLAMA_DEPLOY_DEPLOYMENT_URL_ID;
-  // If only URL_ID is set, populate NAME for downstream code expecting it
-  if (!process.env.LLAMA_DEPLOY_DEPLOYMENT_NAME && process.env.LLAMA_DEPLOY_DEPLOYMENT_URL_ID) {
-    process.env.LLAMA_DEPLOY_DEPLOYMENT_NAME = process.env.LLAMA_DEPLOY_DEPLOYMENT_URL_ID;
-  }
+  const deploymentName = process.env.LLAMA_DEPLOY_DEPLOYMENT_NAME;
   const basePath = process.env.LLAMA_DEPLOY_DEPLOYMENT_BASE_PATH;
   const projectId = process.env.LLAMA_DEPLOY_PROJECT_ID;
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
