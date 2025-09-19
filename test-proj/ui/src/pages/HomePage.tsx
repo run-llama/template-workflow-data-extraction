@@ -3,7 +3,7 @@ import {
   WorkflowTrigger,
   WorkflowProgressBar,
   ExtractedDataItemGrid,
-  useWorkflowTaskList,
+  useWorkflowHandlerList,
 } from "@llamaindex/ui";
 import type { TypedAgentData } from "llama-cloud-services/beta/agent";
 import styles from "./HomePage.module.css";
@@ -20,8 +20,10 @@ export default function HomePage() {
  * Returns a key that increments when a task is completed, can be used to force a re-render of the task list
  */
 function taskCompletedState() {
-  const { tasks } = useWorkflowTaskList();
-  const runningTasks = tasks.filter((task) => task.status === "running");
+  const { handlers } = useWorkflowHandlerList("process-file");
+  const runningTasks = handlers.filter(
+    (handler) => handler.status === "running",
+  );
   const [runningTaskCount, setRunningTaskCount] = useState(runningTasks.length);
   const [taskKey, setTaskKey] = useState(0);
   useEffect(() => {
@@ -69,7 +71,10 @@ function TaskList() {
             }}
           />
         </div>
-        <WorkflowProgressBar className={styles.progressBar} />
+        <WorkflowProgressBar
+          className={styles.progressBar}
+          workflowName="process-file"
+        />
         <ExtractedDataItemGrid
           onRowClick={goToItem}
           builtInColumns={{
