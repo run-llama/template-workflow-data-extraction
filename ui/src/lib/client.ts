@@ -2,8 +2,8 @@ import { MySchema } from "@/schemas/MySchema";
 import { ExtractedData } from "llama-cloud-services/beta/agent";
 import {
   ApiClients,
-  createWorkflowClient,
-  createWorkflowConfig,
+  createWorkflowsClient,
+  createWorkflowsConfig,
 } from "@llamaindex/ui";
 import { createCloudAgentClient, cloudApiClient } from "@llamaindex/ui";
 import { AGENT_NAME, EXTRACTED_DATA_COLLECTION } from "./config";
@@ -30,8 +30,8 @@ const agentClient = createCloudAgentClient<ExtractedData<MySchema>>({
   collection: EXTRACTED_DATA_COLLECTION,
 });
 
-const workflowsClient = createWorkflowClient(
-  createWorkflowConfig({
+const workflowsClient = createWorkflowsClient(
+  createWorkflowsConfig({
     baseUrl: `/deployments/${AGENT_NAME}/`,
   }),
 );
