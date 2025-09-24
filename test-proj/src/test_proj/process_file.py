@@ -153,9 +153,9 @@ class ProcessFileWorkflow(Workflow):
                     message=f"Recorded extracted data for file {event.data.file_name}",
                 )
             )
-            # remove past data when reprocessing the same file
+            # remove past data when reprocessing the same file. Do not validate the schema in case we've changed it.
             if event.data.file_hash:
-                existing_data = await get_data_client().search(
+                existing_data = await get_data_client().untyped_search(
                     filter={
                         "file_hash": {
                             "eq": event.data.file_hash,
