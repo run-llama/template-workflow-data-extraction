@@ -50,4 +50,3 @@ process-file = "test_proj.process_file:workflow"
 
 [tool.llamadeploy.ui]
 directory = "ui"
-
