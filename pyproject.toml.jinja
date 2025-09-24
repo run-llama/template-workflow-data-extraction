@@ -6,12 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "llama-cloud-services>=0.6.69",
-    "llama-index-workflows>=2.2.0,<3.0.0",
+    "llama-index-workflows>=2.4.0,<3.0.0",
     "python-dotenv>=1.1.0",
     "jsonref>=1.1.0",
-    "click>=8.2.1,<8.3.0",
+    "click>=8.2.1,!=8.3.0",
     "httpx>=0.28.1",
-    "llama-index-core>=0.14.0",
+    "llama-index-core>=0.14.0,<0.15.0",
 ]
 
 [project.scripts]
@@ -50,4 +50,3 @@ process-file = "{{project_name_snake}}.process_file:workflow"
 
 [tool.llamadeploy.ui]
 directory = "ui"
-
