@@ -8,7 +8,6 @@ import {
 import type { TypedAgentData } from "llama-cloud-services/beta/agent";
 import styles from "./HomePage.module.css";
 import { useNavigate } from "react-router-dom";
-import { agentClient } from "@/lib/client";
 import { useEffect, useState } from "react";
 
 export default function HomePage() {
@@ -45,20 +44,18 @@ function TaskList() {
     <div className={styles.page}>
       <main className={styles.main}>
         <div className={styles.grid}>
-          <ItemCount title="Total Items" client={agentClient} />
+          <ItemCount title="Total Items" />
           <ItemCount
             title="Reviewed"
             filter={{
               status: { eq: "approved" },
             }}
-            client={agentClient}
           />
           <ItemCount
             title="Needs Review"
             filter={{
               status: { eq: "pending_review" },
             }}
-            client={agentClient}
           />
         </div>
         <div className={styles.commandBar}>
