@@ -7,7 +7,7 @@ extraction review UI, where you can review and correct extractions.
 
 ## Customizing the schema.
 
-The starter contains a placeholder `MySchema` that is used for extraction. See [`schema.py`](./src/{{project_name_snake}}/schemas.py). 
+The starter contains a placeholder `MySchema` that is used for extraction. See [`schema.py`](./src/extraction_review/schemas.py). 
 
 You should customize this `schema.py` for your use case to modify the extracted data. You can also rename the schema from `MySchema` to 
 something more appropriate for your use case. Do a find and replace on "MySchema" to also fix the frontend references.

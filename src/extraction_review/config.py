@@ -17,7 +17,7 @@ dotenv.load_dotenv()
 # otherwise calls to get or set data will fail. You may need to adjust the `or `
 # name for development
 agent_name = os.getenv("LLAMA_DEPLOY_DEPLOYMENT_NAME")
-agent_name_or_default = agent_name or "{{ project_name }}"
+agent_name_or_default = agent_name or "extraction-review"
 # required for all llama cloud calls
 api_key = os.environ["LLAMA_CLOUD_API_KEY"]
 # get this in case running against a different environment than production

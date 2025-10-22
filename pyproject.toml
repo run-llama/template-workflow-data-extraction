@@ -1,5 +1,5 @@
 [project]
-name = "{{project_name}}"
+name = "extraction-review"
 version = "0.1.0"
 description = "Extracts data"
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-export-types = "{{project_name_snake}}.export_types:export_types"
+export-types = "extraction_review.export_types:export_types"
 
 [dependency-groups]
 dev = [
@@ -46,7 +46,7 @@ env_files = [".env"]
 llama_cloud = true
 
 [tool.llamadeploy.workflows]
-process-file = "{{project_name_snake}}.process_file:workflow"
+process-file = "extraction_review.process_file:workflow"
 
 [tool.llamadeploy.ui]
 directory = "ui"

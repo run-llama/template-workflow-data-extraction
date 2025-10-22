@@ -1,5 +1,5 @@
 {
-  "name": "{{ project_name }}-ui",
+  "name": "extraction-review-ui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
