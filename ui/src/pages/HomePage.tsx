@@ -7,7 +7,7 @@ import {
 import type { TypedAgentData } from "llama-cloud-services/beta/agent";
 import styles from "./HomePage.module.css";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { WorkflowProgress } from "@/lib/WorkflowProgress";
 
 export default function HomePage() {
@@ -21,15 +21,6 @@ function TaskList() {
   };
   const [reloadSignal, setReloadSignal] = useState(0);
   const [handlers, setHandlers] = useState<HandlerState[]>([]);
-  const lastRunningCount = useRef(0);
-  const runningCount = handlers.filter((h) => h.status === "running").length;
-  useEffect(() => {
-    // reload whenever a handler completes
-    if (runningCount < lastRunningCount.current) {
-      setReloadSignal(reloadSignal + 1);
-    }
-    lastRunningCount.current = runningCount;
-  }, [runningCount]);
 
   return (
     <div className={styles.page}>
@@ -52,7 +43,13 @@ function TaskList() {
           />
         </div>
         <div className={styles.commandBar}>
-          <WorkflowProgress workflowName="process-file" handlers={handlers} />
+          <WorkflowProgress
+            workflowName="process-file"
+            handlers={handlers}
+            onWorkflowCompletion={() => {
+              setReloadSignal(reloadSignal + 1);
+            }}
+          />
           <WorkflowTrigger
             workflowName="process-file"
             customWorkflowInput={(files) => {
