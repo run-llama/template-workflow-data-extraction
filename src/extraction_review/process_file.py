@@ -32,7 +32,7 @@ class FileDownloadedEvent(Event):
     pass
 
 
-class UIToast(Event):
+class Status(Event):
     level: Literal["info", "warning", "error"]
     message: str
 
@@ -99,7 +99,7 @@ class ProcessFileWorkflow(Workflow):
         except Exception as e:
             logger.error(f"Error downloading file {state.file_id}: {e}", exc_info=True)
             ctx.write_event_to_stream(
-                UIToast(
+                Status(
                     level="error",
                     message=f"Error downloading file {state.file_id}: {e}",
                 )
@@ -126,7 +126,7 @@ class ProcessFileWorkflow(Workflow):
             )
             logger.info(f"Extracting data from file {state.filename}")
             ctx.write_event_to_stream(
-                UIToast(
+                Status(
                     level="info", message=f"Extracting data from file {state.filename}"
                 )
             )
@@ -148,7 +148,7 @@ class ProcessFileWorkflow(Workflow):
                 exc_info=True,
             )
             ctx.write_event_to_stream(
-                UIToast(
+                Status(
                     level="error",
                     message=f"Error extracting data from file {state.filename}: {e}",
                 )
@@ -163,7 +163,7 @@ class ProcessFileWorkflow(Workflow):
         try:
             logger.info(f"Recorded extracted data for file {event.data.file_name}")
             ctx.write_event_to_stream(
-                UIToast(
+                Status(
                     level="info",
                     message=f"Recorded extracted data for file {event.data.file_name}",
                 )
@@ -191,7 +191,7 @@ class ProcessFileWorkflow(Workflow):
                 exc_info=True,
             )
             ctx.write_event_to_stream(
-                UIToast(
+                Status(
                     level="error",
                     message=f"Error recording extracted data for file {event.data.file_name}: {e}",
                 )
