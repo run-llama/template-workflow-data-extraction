@@ -25,7 +25,7 @@ For more complex customizations, you can edit the rest of the application. For e
 
 ## Linting and type checking
 
-Python and javascript pacakges contain helpful scripts to lint, format, and type check the code.
+Python and javascript packages contain helpful scripts to lint, format, and type check the code.
 
 To check and fix python code:
 
