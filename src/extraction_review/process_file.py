@@ -1,40 +1,34 @@
 import asyncio
-import hashlib
+import json
 import logging
-import os
-from pathlib import Path
-import tempfile
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-import httpx
-from llama_cloud import ExtractRun
-from llama_cloud_services.extract import SourceText
-from llama_cloud_services.beta.agent_data import ExtractedData, InvalidExtractionData
+from llama_cloud import AsyncLlamaCloud
+from llama_cloud.types.beta.extracted_data import ExtractedData, InvalidExtractionData
+from llama_cloud.types.file_query_params import Filter
 from pydantic import BaseModel
 from workflows import Context, Workflow, step
 from workflows.events import Event, StartEvent, StopEvent
+from workflows.resource import Resource, ResourceConfig
 
-from .clients import get_llama_cloud_client, get_data_client, get_extract_agent
-from .schema import get_extraction_schema
+from .clients import agent_name, get_llama_cloud_client, project_id
+from .config import EXTRACTED_DATA_COLLECTION, ExtractConfig, get_extraction_schema
 
 logger = logging.getLogger(__name__)
 
 
 class FileEvent(StartEvent):
     file_id: str
-
-
-class DownloadFileEvent(Event):
-    pass
-
-
-class FileDownloadedEvent(Event):
-    pass
+    file_hash: str | None = None
 
 
 class Status(Event):
     level: Literal["info", "warning", "error"]
     message: str
+
+
+class ExtractJobStartedEvent(Event):
+    pass
 
 
 class ExtractedEvent(Event):
@@ -47,105 +41,143 @@ class ExtractedInvalidEvent(Event):
 
 class ExtractionState(BaseModel):
     file_id: str | None = None
-    file_path: str | None = None
     filename: str | None = None
+    file_hash: str | None = None
+    extract_job_id: str | None = None
 
 
 class ProcessFileWorkflow(Workflow):
-    """
-    Given a file path, this workflow will process a single file through the custom extraction logic.
-    """
+    """Extract structured data from a document and save it for review."""
 
     @step()
-    async def run_file(self, event: FileEvent, ctx: Context) -> DownloadFileEvent:
-        logger.info(f"Running file {event.file_id}")
-        async with ctx.store.edit_state() as state:
-            state.file_id = event.file_id
-        return DownloadFileEvent()
+    async def start_extraction(
+        self,
+        event: FileEvent,
+        ctx: Context[ExtractionState],
+        llama_cloud_client: Annotated[
+            AsyncLlamaCloud, Resource(get_llama_cloud_client)
+        ],
+        extract_config: Annotated[
+            ExtractConfig,
+            ResourceConfig(
+                config_file="configs/config.json",
+                path_selector="extract",
+                label="Extraction Settings",
+                description="Configuration for document extraction quality and features",
+            ),
+        ],
+    ) -> ExtractJobStartedEvent:
+        """Start extraction job for the document."""
+        file_id = event.file_id
+        logger.info(f"Running file {file_id}")
 
-    @step()
-    async def download_file(
-        self, event: DownloadFileEvent, ctx: Context[ExtractionState]
-    ) -> FileDownloadedEvent:
-        """Download the file reference from the cloud storage"""
-        state = await ctx.store.get_state()
-        if state.file_id is None:
-            raise ValueError("File ID is not set")
         try:
-            file_metadata = await get_llama_cloud_client().files.get_file(
-                id=state.file_id
+            files = await llama_cloud_client.files.query(
+                filter=Filter(file_ids=[file_id])
             )
-            file_url = await get_llama_cloud_client().files.read_file_content(
-                state.file_id
-            )
-
-            temp_dir = tempfile.gettempdir()
+            file_metadata = files.items[0]
             filename = file_metadata.name
-            file_path = os.path.join(temp_dir, filename)
-            client = httpx.AsyncClient()
-            # Report progress to the UI
-            logger.info(f"Downloading file {file_url.url} to {file_path}")
-
-            async with client.stream("GET", file_url.url) as response:
-                with open(file_path, "wb") as f:
-                    async for chunk in response.aiter_bytes():
-                        f.write(chunk)
-            logger.info(f"Downloaded file {file_url.url} to {file_path}")
-            async with ctx.store.edit_state() as state:
-                state.file_path = file_path
-                state.filename = filename
-            return FileDownloadedEvent()
-
         except Exception as e:
-            logger.error(f"Error downloading file {state.file_id}: {e}", exc_info=True)
+            logger.error(f"Error fetching file metadata {file_id}: {e}", exc_info=True)
             ctx.write_event_to_stream(
                 Status(
                     level="error",
-                    message=f"Error downloading file {state.file_id}: {e}",
+                    message=f"Error fetching file metadata {file_id}: {e}",
                 )
             )
             raise e
 
+        logger.info(f"Extracting data from file {filename}")
+        ctx.write_event_to_stream(
+            Status(level="info", message=f"Extracting data from file {filename}")
+        )
+
+        if extract_config.extraction_agent_id:
+            # Remote agent mode: delegate schema and settings to the agent
+            extract_job = await llama_cloud_client.extraction.jobs.extract(
+                extraction_agent_id=extract_config.extraction_agent_id,
+                file_id=file_id,
+            )
+        else:
+            # Local mode: use schema and settings from config.json
+            extract_job = await llama_cloud_client.extraction.run(
+                config=extract_config.settings.model_dump(),
+                data_schema=extract_config.json_schema,
+                file_id=file_id,
+                project_id=project_id,
+            )
+
+        file_hash = event.file_hash or file_metadata.external_file_id
+
+        async with ctx.store.edit_state() as state:
+            state.file_id = file_id
+            state.filename = filename
+            state.file_hash = file_hash
+            state.extract_job_id = extract_job.id
+
+        return ExtractJobStartedEvent()
+
     @step()
-    async def process_file(
-        self, event: FileDownloadedEvent, ctx: Context[ExtractionState]
-    ) -> ExtractedEvent | ExtractedInvalidEvent:
-        """Runs the extraction against the file"""
+    async def complete_extraction(
+        self,
+        event: ExtractJobStartedEvent,
+        ctx: Context[ExtractionState],
+        llama_cloud_client: Annotated[
+            AsyncLlamaCloud, Resource(get_llama_cloud_client)
+        ],
+        extract_config: Annotated[
+            ExtractConfig,
+            ResourceConfig(
+                config_file="configs/config.json",
+                path_selector="extract",
+                label="Extraction Settings",
+                description="Configuration for document extraction quality and features",
+            ),
+        ],
+    ) -> StopEvent:
+        """Wait for extraction to complete, validate results, and save for review."""
         state = await ctx.store.get_state()
-        if state.file_path is None or state.filename is None:
-            raise ValueError("File path or filename is not set")
+        if state.extract_job_id is None:
+            raise ValueError("Job ID cannot be null when waiting for its completion")
+
+        await llama_cloud_client.extraction.jobs.wait_for_completion(
+            state.extract_job_id
+        )
+
+        extracted_result = await llama_cloud_client.extraction.jobs.get_result(
+            state.extract_job_id
+        )
+        extract_run = await llama_cloud_client.extraction.runs.get(
+            run_id=extracted_result.run_id
+        )
+
+        extracted_event: ExtractedEvent | ExtractedInvalidEvent
         try:
-            agent = get_extract_agent()
-            schema = await get_extraction_schema()
-            # track the content of the file, so as to be able to de-duplicate
-            file_content = Path(state.file_path).read_bytes()
-            file_hash = hashlib.sha256(file_content).hexdigest()
-            source_text = SourceText(
-                file=state.file_path,
-                filename=state.filename,
+            logger.info(
+                f"Extracted data: {json.dumps(extracted_result.model_dump(), indent=2)}"
             )
-            logger.info(f"Extracting data from file {state.filename}")
-            ctx.write_event_to_stream(
-                Status(
-                    level="info", message=f"Extracting data from file {state.filename}"
+            if extract_config.extraction_agent_id:
+                # Remote agent mode: get schema from the agent
+                agent = await llama_cloud_client.extraction.extraction_agents.get(
+                    extract_config.extraction_agent_id
                 )
+                schema_class = get_extraction_schema(agent.data_schema)
+            else:
+                schema_class = get_extraction_schema(extract_config.json_schema)
+            data = ExtractedData.from_extraction_result(
+                result=extract_run,
+                schema=schema_class,
+                file_name=state.filename,
+                file_id=state.file_id,
+                file_hash=state.file_hash,
             )
-            extracted_result: ExtractRun = await agent.aextract(source_text)
-            try:
-                logger.info(f"Extracted data: {extracted_result}")
-                data = ExtractedData.from_extraction_result(
-                    result=extracted_result,
-                    schema=schema,
-                    file_hash=file_hash,
-                )
-                return ExtractedEvent(data=data)
-            except InvalidExtractionData as e:
-                logger.error(f"Error validating extracted data: {e}", exc_info=True)
-                return ExtractedInvalidEvent(data=e.invalid_item)
+            extracted_event = ExtractedEvent(data=data)
+        except InvalidExtractionData as e:
+            logger.error(f"Error validating extracted data: {e}", exc_info=True)
+            extracted_event = ExtractedInvalidEvent(data=e.invalid_item)
         except Exception as e:
             logger.error(
-                f"Error extracting data from file {state.filename}: {e}",
-                exc_info=True,
+                f"Error extracting data from file {state.filename}: {e}", exc_info=True
             )
             ctx.write_event_to_stream(
                 Status(
@@ -155,61 +187,55 @@ class ProcessFileWorkflow(Workflow):
             )
             raise e
 
-    @step()
-    async def record_extracted_data(
-        self, event: ExtractedEvent | ExtractedInvalidEvent, ctx: Context
-    ) -> StopEvent:
-        """Records the extracted data to the agent data API"""
-        try:
-            logger.info(f"Recorded extracted data for file {event.data.file_name}")
-            ctx.write_event_to_stream(
-                Status(
-                    level="info",
-                    message=f"Recorded extracted data for file {event.data.file_name}",
-                )
-            )
-            # remove past data when reprocessing the same file
-            if event.data.file_hash:
-                await get_data_client().delete(
-                    filter={
-                        "file_hash": {
-                            "eq": event.data.file_hash,
-                        },
+        ctx.write_event_to_stream(extracted_event)
+
+        extracted_data = extracted_event.data
+        data_dict = extracted_data.model_dump()
+        if extracted_data.file_hash is not None:
+            delete_result = await llama_cloud_client.beta.agent_data.delete_by_query(
+                deployment_name=agent_name or "_public",
+                collection=EXTRACTED_DATA_COLLECTION,
+                filter={
+                    "file_hash": {
+                        "eq": extracted_data.file_hash,
                     },
-                )
+                },
+            )
+            if delete_result.deleted_count > 0:
                 logger.info(
-                    f"Removing past data for file {event.data.file_name} with hash {event.data.file_hash}"
+                    f"Removed {delete_result.deleted_count} existing record(s) "
+                    f"for file {extracted_data.file_name}"
                 )
-            # finally, save the new data
-            item_id = await get_data_client().create_item(event.data)
-            return StopEvent(
-                result=item_id.id,
+        item = await llama_cloud_client.beta.agent_data.agent_data(
+            data=data_dict,
+            deployment_name=agent_name or "_public",
+            collection=EXTRACTED_DATA_COLLECTION,
+        )
+        logger.info(
+            f"Recorded extracted data for file {extracted_data.file_name or ''}"
+        )
+        ctx.write_event_to_stream(
+            Status(
+                level="info",
+                message=f"Recorded extracted data for file {extracted_data.file_name or ''}",
             )
-        except Exception as e:
-            logger.error(
-                f"Error recording extracted data for file {event.data.file_name}: {e}",
-                exc_info=True,
-            )
-            ctx.write_event_to_stream(
-                Status(
-                    level="error",
-                    message=f"Error recording extracted data for file {event.data.file_name}: {e}",
-                )
-            )
-            raise e
+        )
+        return StopEvent(result=item.id)
 
 
 workflow = ProcessFileWorkflow(timeout=None)
 
 if __name__ == "__main__":
+    from pathlib import Path
     from dotenv import load_dotenv
 
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
 
     async def main():
-        file = await get_llama_cloud_client().files.upload_file(
-            upload_file=Path("test.pdf").open("rb")
+        file = await get_llama_cloud_client().files.create(
+            file=Path("test.pdf").open("rb"),
+            purpose="extract",
         )
         await workflow.run(start_event=FileEvent(file_id=file.id))
 
