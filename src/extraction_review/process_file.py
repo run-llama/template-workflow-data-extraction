@@ -5,7 +5,6 @@ from typing import Annotated, Any, Literal
 
 from llama_cloud import AsyncLlamaCloud
 from llama_cloud.types.beta.extracted_data import ExtractedData, InvalidExtractionData
-from llama_cloud.types.file_query_params import Filter
 from pydantic import BaseModel
 from workflows import Context, Workflow, step
 from workflows.events import Event, StartEvent, StopEvent
@@ -72,10 +71,8 @@ class ProcessFileWorkflow(Workflow):
         logger.info(f"Running file {file_id}")
 
         try:
-            files = await llama_cloud_client.files.query(
-                filter=Filter(file_ids=[file_id])
-            )
-            file_metadata = files.items[0]
+            files_page = await llama_cloud_client.files.list(file_ids=[file_id])
+            file_metadata = files_page.items[0]
             filename = file_metadata.name
         except Exception as e:
             logger.error(f"Error fetching file metadata {file_id}: {e}", exc_info=True)
