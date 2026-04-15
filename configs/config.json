@@ -1,7 +1,8 @@
 {
   "extract": {
-    "extraction_agent_id": null,
-    "json_schema": {
+    "product_type": "extract_v2",
+    "configuration_id": null,
+    "data_schema": {
       "type": "object",
       "properties": {
         "document_type": {
@@ -20,13 +21,25 @@
       },
       "required": ["document_type", "summary", "key_points"]
     },
-    "settings": {
-      "extraction_mode": "PREMIUM",
-      "system_prompt": null,
-      "citation_bbox": true,
-      "use_reasoning": false,
-      "cite_sources": true,
-      "confidence_scores": true
-    }
+    "tier": "agentic",
+    "extraction_target": "per_doc",
+    "cite_sources": true,
+    "confidence_scores": true
+  },
+  "classify": {
+    "product_type": "classify_v2",
+    "configuration_id": null,
+    "rules": []
+  },
+  "parse": {
+    "product_type": "parse_v2",
+    "configuration_id": null,
+    "tier": "agentic",
+    "version": "latest"
+  },
+  "split": {
+    "product_type": "split_v1",
+    "configuration_id": null,
+    "categories": []
   }
 }
