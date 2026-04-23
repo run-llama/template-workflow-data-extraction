@@ -13,13 +13,6 @@ api_key = os.getenv("LLAMA_CLOUD_API_KEY")
 base_url = os.getenv("LLAMA_CLOUD_BASE_URL")
 project_id = os.getenv("LLAMA_DEPLOY_PROJECT_ID")
 
-if os.getenv("FAKE_LLAMA_CLOUD"):
-    from llama_cloud_fake import FakeLlamaCloudServer
-
-    fake = FakeLlamaCloudServer().install()
-else:
-    fake = None
-
 
 def get_llama_cloud_client() -> AsyncLlamaCloud:
     """Cloud services connection for file storage and processing."""
